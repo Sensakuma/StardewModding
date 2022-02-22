@@ -43,6 +43,7 @@ namespace FarmerVitalsEvolved
 			if (!Context.IsWorldReady)
 			{
 				base.Monitor.Log("Error during start of new day.", (LogLevel)4);
+				return;
 			}
 			else
 			{
@@ -58,6 +59,7 @@ namespace FarmerVitalsEvolved
 			if (!Context.IsWorldReady)
 			{
 				base.Monitor.Log("Error during end of day.", (LogLevel)4);
+				return;
 			}
 			else
 			{
@@ -72,10 +74,10 @@ namespace FarmerVitalsEvolved
 			if (!Context.IsWorldReady)
 			{
 				base.Monitor.Log("Something went wrong before calculating max vitals.", (LogLevel)4);
+				return;
 			}
 			else
 			{
-
 				if (this.Config.enableBaseVitals)
 				{
 					this.CalculateBaseVitals();
@@ -95,6 +97,7 @@ namespace FarmerVitalsEvolved
 				{
 					this.CalculateSkillVitals();
 				}
+
 				this.vitalsMaxHealth = this.newMaxHealth - this.removeVanillaHealth;
 				this.vitalsMaxStamina = this.newMaxStamina - this.removeVanillaStamina;
 			}
@@ -130,13 +133,28 @@ namespace FarmerVitalsEvolved
 		{
 			if (this.Config.enableSnakeMilkVitals && Game1.player.mailReceived.Contains("qiCave"))
 			{
-				base.Monitor.Log("You drank iridium Snake Milk!", (LogLevel)3);
+				base.Monitor.Log("You drank Iridium Snake Milk", (LogLevel)1);
+				this.newMaxHealth += this.Config.snakeMilkHealthGain;
+				this.newMaxStamina += this.Config.snakeMilkStaminaGain;
+				this.removeVanillaHealth += vanillaSnakeMilkHealth;
 			}
 
 			if (this.Config.enableStardropVitals && Game1.player.MaxStamina > vanillaMaxStamina)
 			{
-				int stardropCount = (Game1.player.MaxStamina - vanillaMaxStamina) / vanillaStardropStamina;
-				base.Monitor.Log("If calculations are correct you have collected " + stardropCount.ToString() + " Stardrops", (LogLevel)3);
+				int extraStamina = Game1.player.MaxStamina - vanillaMaxStamina;
+				int stardropCount = extraStamina / vanillaStardropStamina;
+				int vanillaStardropStaminaTotal = stardropCount * vanillaStardropStamina;
+				int stardropHealth = stardropCount * this.Config.stardropHealthGain;
+				int stardropStamina = stardropCount * this.Config.stardropStaminaGain;
+				this.newMaxHealth += stardropHealth;
+				this.newMaxStamina += stardropStamina;
+				this.removeVanillaStamina += vanillaStardropStaminaTotal;
+				base.Monitor.Log("If calculations are correct you have collected " + stardropCount.ToString() + " Stardrop(s)", (LogLevel)1);
+				if (extraStamina != vanillaStardropStaminaTotal)
+                {
+					int staminaRemainder = extraStamina - vanillaStardropStaminaTotal;
+					base.Monitor.Log(staminaRemainder.ToString() + " Stamina remaining after Stardrop calculations, are you getting stamina from other sources?", (LogLevel)3);
+				}
 			}
 		}
 
@@ -144,6 +162,7 @@ namespace FarmerVitalsEvolved
 		{
 			if (Game1.player.professions.Contains(24))
 			{
+
 				base.Monitor.Log("You have the fighter profession!", (LogLevel)3);
 			}
 
@@ -155,7 +174,6 @@ namespace FarmerVitalsEvolved
 
 		private void CalculateSkillVitals()
 		{
-
 			if (this.Config.enableFarmingVitals)
 			{
 				this.CalculateFarmingVitals();
@@ -224,7 +242,7 @@ namespace FarmerVitalsEvolved
 			int combatStamina = (int)((float)combatLevel * this.Config.combatStaminaGain);
 			this.newMaxStamina += combatStamina;
 
-			if (!this.Config.overrideVanillaCombatHealth)
+			if (this.Config.overrideVanillaCombatHealth == false)
 			{
 				base.Monitor.Log("Using vanilla combat health progression, 5 health gained every level except level 5 and 10", (LogLevel)1);
 			}
@@ -245,9 +263,9 @@ namespace FarmerVitalsEvolved
 				}
 				int vanillaCombatHealth = combatLevel * vanillaCombatHealthGain;
 				this.removeVanillaHealth += vanillaCombatHealth;
+				base.Monitor.Log(vanillaCombatHealth.ToString() + " Health to be removed from Combat Levels", (LogLevel)2);
 			}
 		}
-
 		////////////////////////////////////////////////// MISC METHODS //////////////////////////////////////////////////
 		private void ResetVariables()
         {

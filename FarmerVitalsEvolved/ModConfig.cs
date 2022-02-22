@@ -34,16 +34,16 @@ namespace FarmerVitalsEvolved
 
 		public bool enableEventVitals = true;
 		public bool enableSnakeMilkVitals = true;
-		public int snakeMilkHealth = 50;
-		public int snakeMilkStamina = 0;
+		public int snakeMilkHealthGain = 50;
+		public int snakeMilkStaminaGain = 0;
 
 		public bool enableStardropVitals = true;
-		public int stardropHealth = 0;
-		public int stardropStamina = 30;
+		public int stardropHealthGain = 0;
+		public int stardropStaminaGain = 30;
 
 		public bool enableProfessionVitals = true;
-		public int fighterHealth = 15;
-		public int DefenderHealth = 25;
+		public int fighterHealthGain = 15;
+		public int DefenderHealthGain = 25;
 
 		public bool enableSleepVitals = true;
 		public int sleepHealthGain = 35;
