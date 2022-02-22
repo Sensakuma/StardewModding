@@ -43,7 +43,7 @@ namespace FarmerVitalsEvolved
 
 		public bool enableProfessionVitals = true;
 		public int fighterHealthGain = 15;
-		public int DefenderHealthGain = 25;
+		public int defenderHealthGain = 25;
 
 		public bool enableSleepVitals = true;
 		public int sleepHealthGain = 35;

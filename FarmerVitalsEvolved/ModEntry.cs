@@ -162,12 +162,17 @@ namespace FarmerVitalsEvolved
 		{
 			if (Game1.player.professions.Contains(24))
 			{
-
+				int fighterHealth = this.Config.fighterHealthGain;
+				this.newMaxHealth += fighterHealth;
+				this.removeVanillaHealth += vanillaFighterHealth;
 				base.Monitor.Log("You have the fighter profession!", (LogLevel)3);
 			}
 
 			if (Game1.player.professions.Contains(27))
 			{
+				int defenderHealth = this.Config.defenderHealthGain;
+				this.newMaxHealth += defenderHealth;
+				this.removeVanillaHealth += vanillaDefenderHealth;
 				base.Monitor.Log("You have the defender profession!", (LogLevel)3);
 			}
 		}
