@@ -25,21 +25,18 @@ namespace FarmerVitalsEvolved
 		public override void Entry(IModHelper helper)
 		{
 			this.Config = base.Helper.ReadConfig<ModConfig>();
-
-			if (this.Config.enableMod)
-			{
-				base.Monitor.Log("Mod is enabled", (LogLevel)1);
-				helper.Events.GameLoop.DayEnding += this.DayEndGameLoop;
-				helper.Events.GameLoop.DayStarted += this.DayStartGameLoop;
-			}
-			else
-			{
-				base.Monitor.Log("Mod is currently disabled.", (LogLevel)3);
-			}
+			helper.Events.GameLoop.GameLaunched += this.OnGameLaunched;
+			helper.Events.GameLoop.DayEnding += this.DayEndGameLoop;
+			helper.Events.GameLoop.DayStarted += this.DayStartGameLoop;
 		}
 		////////////////////////////////////////////////// MAIN MOD LOOP //////////////////////////////////////////////////
 		private void DayStartGameLoop(object sender, DayStartedEventArgs e)
 		{
+			if (this.Config.enableMod == false)
+            {
+				return;
+            }
+			
 			if (!Context.IsWorldReady)
 			{
 				base.Monitor.Log("Error during start of new day.", (LogLevel)4);
@@ -56,9 +53,8 @@ namespace FarmerVitalsEvolved
 
 		private void DayEndGameLoop(object sender, DayEndingEventArgs e)
 		{
-			if (!Context.IsWorldReady)
+			if (!Context.IsWorldReady || this.Config.enableMod == false)
 			{
-				base.Monitor.Log("Error during end of day.", (LogLevel)4);
 				return;
 			}
 			else
@@ -78,24 +74,17 @@ namespace FarmerVitalsEvolved
 			}
 			else
 			{
+				this.CalculateEventVitals();
+				this.CalculateSkillVitals();
+
 				if (this.Config.enableBaseVitals)
 				{
 					this.CalculateBaseVitals();
 				}
 
-				if (this.Config.enableEventVitals)
-				{
-					this.CalculateEventVitals();
-				}
-
 				if (this.Config.enableProfessionVitals && (Game1.player.professions.Contains(24)))
 				{
 					this.CalculateProfessionVitals();
-				}
-
-				if (this.Config.enableSkillVitals)
-				{
-					this.CalculateSkillVitals();
 				}
 
 				this.vitalsMaxHealth = this.newMaxHealth - this.removeVanillaHealth;
@@ -273,11 +262,312 @@ namespace FarmerVitalsEvolved
 		}
 		////////////////////////////////////////////////// MISC METHODS //////////////////////////////////////////////////
 		private void ResetVariables()
-        {
+		{
 			this.newMaxHealth = 0;
 			this.newMaxStamina = 0;
 			this.removeVanillaHealth = 0;
 			this.removeVanillaStamina = 0;
+		}
+
+		public void OnGameLaunched(object sender, GameLaunchedEventArgs e)
+		{
+			// get Generic Mod Config Menu's API (if it's installed)
+			var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+			if (configMenu is null)
+				return;
+
+			// register mod
+			configMenu.Register(
+				mod: this.ModManifest,
+				reset: () => this.Config = new ModConfig(),
+				save: () => this.Helper.WriteConfig(this.Config)
+			);
+			// MOD TOGGLE
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Mod Enabled",
+				tooltip: () => null,
+				getValue: () => this.Config.enableMod,
+				setValue: value => this.Config.enableMod = value
+			);
+			// TITLE BASE VITALS
+			configMenu.AddSectionTitle(
+				mod: this.ModManifest,
+				text: () => "Base Vitals",
+				tooltip: () => "Change starting Health and Stamina."
+			);
+			// ENABLE BASE VITALS
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Enabled",
+				tooltip: () => null,
+				getValue: () => this.Config.enableBaseVitals,
+				setValue: value => this.Config.enableBaseVitals = value
+			);
+			// CHOOSE BASE HEALTH
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Base Max Health",
+				tooltip: () => "Health at the start of the game. (Vanilla is 100)",
+				getValue: () => this.Config.baseMaxHealth,
+				setValue: value => this.Config.baseMaxHealth = value
+			);
+			// CHOOSE BASE STAMINA
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Base Max Stamina",
+				tooltip: () => "Stamina at the start of the game. (Vanilla is 270)",
+				getValue: () => this.Config.baseMaxStamina,
+				setValue: value => this.Config.baseMaxStamina = value
+			);
+			// TITLE STARDROP VITALS
+			configMenu.AddSectionTitle(
+				mod: this.ModManifest,
+				text: () => "Stardrop Vitals",
+				tooltip: () => "Change Health and Stamina gained from Stardrops."
+			);
+			// ENABLE STARDROP VITALS
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Enabled",
+				tooltip: () => null,
+				getValue: () => this.Config.enableStardropVitals,
+				setValue: value => this.Config.enableStardropVitals = value
+			);
+			// STARDROP HEALTH VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Stardrop Health",
+				tooltip: () => "Health gained from consuming a Stardrop. (Vanilla is 0)",
+				getValue: () => this.Config.stardropHealthGain,
+				setValue: value => this.Config.stardropHealthGain = value
+			);
+			// STARDROP STAMINA VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Stardrop Stamina",
+				tooltip: () => "Stamina gained from consuming a Stardrop. (Vanilla is 34)",
+				getValue: () => this.Config.stardropStaminaGain,
+				setValue: value => this.Config.stardropStaminaGain = value
+			);
+			// TITLE IRIDIUM SNAKE MILK VITALS
+			configMenu.AddSectionTitle(
+				mod: this.ModManifest,
+				text: () => "Iridium Snake Milk Vitals",
+				tooltip: () => "Change Health and Stamina gained from Iridium Snake Milk."
+			);
+			// ENABLE IRIDIUM SNAKE MILK VITALS
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Enable",
+				tooltip: () => null,
+				getValue: () => this.Config.enableSnakeMilkVitals,
+				setValue: value => this.Config.enableSnakeMilkVitals = value
+			);
+			// IRIDIUM SNAKE MILK HEALTH VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Snake Milk Health",
+				tooltip: () => "Health gained from consuming a Iridium Snake Milk. (Vanilla is 25)",
+				getValue: () => this.Config.snakeMilkHealthGain,
+				setValue: value => this.Config.snakeMilkHealthGain = value
+			);
+			// IRIDIUM SNAKE MILK STAMINA VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Snake Milk Stamina",
+				tooltip: () => "Stamina gained from consuming a Iridium Snake Milk. (Vanilla is 0)",
+				getValue: () => this.Config.snakeMilkStaminaGain,
+				setValue: value => this.Config.snakeMilkStaminaGain = value
+			);
+			// TITLE PROFESSION VITALS
+			configMenu.AddSectionTitle(
+				mod: this.ModManifest,
+				text: () => "Profession Vitals",
+				tooltip: () => "Change Health gained from Fighter and Defender Professions."
+			);
+			// ENABLE PROFESSION VITALS
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Enabled",
+				tooltip: () => null,
+				getValue: () => this.Config.enableProfessionVitals,
+				setValue: value => this.Config.enableProfessionVitals = value
+			);
+			// FIGHTER HEALTH VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Fighter Health",
+				tooltip: () => "Health you gain from the Fighter Profession. (Vanilla is 15)",
+				getValue: () => this.Config.fighterHealthGain,
+				setValue: value => this.Config.fighterHealthGain = value
+			);
+			// DEFENDER HEALTH VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Defender Health",
+				tooltip: () => "Health you gain from the Defender Profession. (Vanilla is 25)",
+				getValue: () => this.Config.defenderHealthGain,
+				setValue: value => this.Config.defenderHealthGain = value
+			);
+			// TITLE FARMING VITALS
+			configMenu.AddSectionTitle(
+				mod: this.ModManifest,
+				text: () => "Farming Skill Vitals",
+				tooltip: () => "Gain Health and Stamina from Farming Levels."
+			);
+			// ENABLE FARMING VITALS
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Enable",
+				tooltip: () => null,
+				getValue: () => this.Config.enableFarmingVitals,
+				setValue: value => this.Config.enableFarmingVitals = value
+			);
+			// FARMING HEALTH GAIN
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Health Per Level",
+				tooltip: () => null,
+				getValue: () => this.Config.farmingHealthGain,
+				setValue: value => this.Config.farmingHealthGain = value
+			);
+			// FARMING STAMINA VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Stamina Per Level",
+				tooltip: () => null,
+				getValue: () => this.Config.farmingStaminaGain,
+				setValue: value => this.Config.farmingStaminaGain = value
+			);
+			// TITLE MINING VITALS
+			configMenu.AddSectionTitle(
+				mod: this.ModManifest,
+				text: () => "Mining Skill Vitals",
+				tooltip: () => "Gain Health and Stamina from Mining Levels."
+			);
+			// ENABLE MINING VITALS
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Enable",
+				tooltip: () => null,
+				getValue: () => this.Config.enableMiningVitals,
+				setValue: value => this.Config.enableMiningVitals = value
+			);
+			// MINING HEALTH GAIN
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Health Per Level",
+				tooltip: () => null,
+				getValue: () => this.Config.miningHealthGain,
+				setValue: value => this.Config.miningHealthGain = value
+			);
+			// MINING STAMINA VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Stamina Per Level",
+				tooltip: () => null,
+				getValue: () => this.Config.miningStaminaGain,
+				setValue: value => this.Config.miningStaminaGain = value
+			);
+			// TITLE FORAGING VITALS
+			configMenu.AddSectionTitle(
+				mod: this.ModManifest,
+				text: () => "Foraging Skill Vitals",
+				tooltip: () => "Gain Health and Stamina from Foraging Levels."
+			);
+			// ENABLE FORAGING VITALS
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Enable",
+				tooltip: () => null,
+				getValue: () => this.Config.enableForagingVitals,
+				setValue: value => this.Config.enableForagingVitals = value
+			);
+			// FORAGING HEALTH GAIN
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Health Per Level",
+				tooltip: () => null,
+				getValue: () => this.Config.foragingHealthGain,
+				setValue: value => this.Config.foragingHealthGain = value
+			);
+			// FORAGING STAMINA VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Stamina Per Level",
+				tooltip: () => null,
+				getValue: () => this.Config.foragingStaminaGain,
+				setValue: value => this.Config.foragingStaminaGain = value
+			);
+			// TITLE FISHING VITALS
+			configMenu.AddSectionTitle(
+				mod: this.ModManifest,
+				text: () => "Fishing Skill Vitals",
+				tooltip: () => "Gain Health and Stamina from Fishing Levels."
+			);
+			// ENABLE FISHING VITALS
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Enable",
+				tooltip: () => null,
+				getValue: () => this.Config.enableFishingVitals,
+				setValue: value => this.Config.enableFishingVitals = value
+			);
+			// FISHING HEALTH GAIN
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Health Per Level",
+				tooltip: () => null,
+				getValue: () => this.Config.fishingHealthGain,
+				setValue: value => this.Config.fishingHealthGain = value
+			);
+			// FISHING STAMINA VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Stamina Per Level",
+				tooltip: () => null,
+				getValue: () => this.Config.fishingStaminaGain,
+				setValue: value => this.Config.fishingStaminaGain = value
+			);
+			// TITLE COMBAT VITALS
+			configMenu.AddSectionTitle(
+				mod: this.ModManifest,
+				text: () => "Combat Skill Vitals",
+				tooltip: () => "Gain Health and Stamina from Combat Levels."
+			);
+			// ENABLE COMBAT VITALS
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Enable",
+				tooltip: () => null,
+				getValue: () => this.Config.enableCombatVitals,
+				setValue: value => this.Config.enableCombatVitals = value
+			);
+			// OVERRIDE VANILLA COMBAT HEALTH
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Override Vanilla Health",
+				tooltip: () => "Vanilla behavior gives (5) health every level except for levels (5 & 10).",
+				getValue: () => this.Config.overrideVanillaCombatHealth,
+				setValue: value => this.Config.overrideVanillaCombatHealth = value
+			);
+			// COMBAT HEALTH GAIN
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Health Per Level",
+				tooltip: () => "Only in effect if Override Vanilla Health is True",
+				getValue: () => this.Config.combatHealthGain,
+				setValue: value => this.Config.combatHealthGain = value
+			);
+			// COMBAT STAMINA VALUE
+			configMenu.AddNumberOption(
+				mod: this.ModManifest,
+				name: () => "Stamina Per Level",
+				tooltip: () => null,
+				getValue: () => this.Config.combatStaminaGain,
+				setValue: value => this.Config.combatStaminaGain = value
+			);
 		}
 	}
 }
