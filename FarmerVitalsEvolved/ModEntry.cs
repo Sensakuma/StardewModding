@@ -27,15 +27,17 @@ namespace FarmerVitalsEvolved
 		{
 			this.Config = base.Helper.ReadConfig<ModConfig>();
 			helper.Events.GameLoop.GameLaunched += this.OnGameLaunched;
-			helper.Events.GameLoop.ReturnedToTitle += this.OnTitleScreen;
 			helper.Events.GameLoop.DayEnding += this.DayEndGameLoop;
 			helper.Events.GameLoop.DayStarted += this.DayStartGameLoop;
 		}
 		////////////////////////////////////////////////// MAIN MOD LOOP //////////////////////////////////////////////////
 		private void DayStartGameLoop(object sender, DayStartedEventArgs e)
 		{
+			this.DebugToggle();
+
 			if (this.Config.enableMod == false)
             {
+				base.Monitor.Log("Mod is currently disabled.", (LogLevel)3);
 				return;
             }
 			
@@ -46,7 +48,7 @@ namespace FarmerVitalsEvolved
 			}
 			else
 			{
-				base.Monitor.Log("New day, starting calculations...", (LogLevel)(debugVal));
+				base.Monitor.Log("New Day, Calculating Vitals...", (LogLevel)(debugVal++));
 				this.CalculateMaxVitals();
 				this.ApplyNewMaxVitals();
 				this.ApplyVitals();
@@ -278,7 +280,7 @@ namespace FarmerVitalsEvolved
 				int vanillaCombatHealth = tempCombatLevel * vanillaCombatHealthGain;
 				this.removeVanillaHealth += vanillaCombatHealth;
 				base.Monitor.Log("Combat Level " + (combatLevel) + " is giving you " + (combatHealth) + " MaxHealth and, " + (combatStamina) + " MaxStamina.", (LogLevel)(debugVal));
-				base.Monitor.Log(vanillaCombatHealth.ToString() + " Health removed from Vanilla Combat progression", (LogLevel)2);
+				base.Monitor.Log(vanillaCombatHealth.ToString() + " Health removed from Vanilla Combat progression", (LogLevel)(debugVal));
 			}
 
 		}
@@ -303,15 +305,8 @@ namespace FarmerVitalsEvolved
 			}
 		}
 
-		private void OnTitleScreen(object sender, ReturnedToTitleEventArgs e)
-        {
-			DebugToggle(); // Checks to see if you changed the setting in GMCM
-        }
-
 		public void OnGameLaunched(object sender, GameLaunchedEventArgs e)
 		{
-			DebugToggle();
-
 			// get Generic Mod Config Menu's API (if it's installed)
 			var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
 			if (configMenu is null)
