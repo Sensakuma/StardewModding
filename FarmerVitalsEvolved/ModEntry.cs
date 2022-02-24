@@ -8,6 +8,7 @@ namespace FarmerVitalsEvolved
 	public class ModEntry : Mod
 	{
 		private ModConfig Config;
+		private int debugVal;
 		private int newMaxHealth;
 		private int newMaxStamina;
 		private int removeVanillaHealth;
@@ -26,6 +27,7 @@ namespace FarmerVitalsEvolved
 		{
 			this.Config = base.Helper.ReadConfig<ModConfig>();
 			helper.Events.GameLoop.GameLaunched += this.OnGameLaunched;
+			helper.Events.GameLoop.ReturnedToTitle += this.OnTitleScreen;
 			helper.Events.GameLoop.DayEnding += this.DayEndGameLoop;
 			helper.Events.GameLoop.DayStarted += this.DayStartGameLoop;
 		}
@@ -39,12 +41,12 @@ namespace FarmerVitalsEvolved
 			
 			if (!Context.IsWorldReady)
 			{
-				base.Monitor.Log("Error during start of new day.", (LogLevel)4);
+				base.Monitor.Log("World loaded before calculations could be made.", (LogLevel)4);
 				return;
 			}
 			else
 			{
-				base.Monitor.Log("Starting new day.", (LogLevel)1);
+				base.Monitor.Log("New day, starting calculations...", (LogLevel)(debugVal));
 				this.CalculateMaxVitals();
 				this.ApplyNewMaxVitals();
 				this.ApplyVitals();
@@ -69,7 +71,7 @@ namespace FarmerVitalsEvolved
 
 			if (!Context.IsWorldReady)
 			{
-				base.Monitor.Log("Something went wrong before calculating max vitals.", (LogLevel)4);
+				base.Monitor.Log("World loaded before Max Vitals could be calculated.", (LogLevel)4);
 				return;
 			}
 			else
@@ -86,9 +88,12 @@ namespace FarmerVitalsEvolved
 				{
 					this.CalculateProfessionVitals();
 				}
-
+				base.Monitor.Log((Game1.player.maxHealth) + " MaxHealth and, " + (Game1.player.MaxStamina) + " MaxStamina before calculations.", (LogLevel)(debugVal));
+				base.Monitor.Log((removeVanillaHealth) + " Vanilla MaxHealth removed, " + (removeVanillaStamina) + " Vanilla MaxStamina removed.", (LogLevel)(debugVal));
+				base.Monitor.Log((newMaxHealth) + " MaxHealth added, " + (newMaxStamina) + " MaxStamina added.", (LogLevel)(debugVal));
 				this.vitalsMaxHealth = this.newMaxHealth - this.removeVanillaHealth;
 				this.vitalsMaxStamina = this.newMaxStamina - this.removeVanillaStamina;
+				base.Monitor.Log((vitalsMaxHealth) + " MaxHealth difference, " + (vitalsMaxStamina) + "  MaxStamina difference.", (LogLevel)(debugVal));
 			}
 		}
 
@@ -96,6 +101,7 @@ namespace FarmerVitalsEvolved
 		{
 			Game1.player.maxHealth += this.vitalsMaxHealth;
 			Game1.player.MaxStamina += this.vitalsMaxStamina;
+			base.Monitor.Log("Player now has " + (Game1.player.maxHealth) + " MaxHealth and, " + (Game1.player.MaxStamina) + " MaxStamina." , (LogLevel)(debugVal));
 		}
 
 		private void ApplyVitals()
@@ -106,26 +112,33 @@ namespace FarmerVitalsEvolved
 
 		private void RemoveNewMaxVitals()
 		{
+			base.Monitor.Log("Removing Vitals before saving...", (LogLevel)(debugVal));
 			Game1.player.maxHealth -= this.vitalsMaxHealth;
 			Game1.player.MaxStamina -= this.vitalsMaxStamina;
+			base.Monitor.Log("Player now has " + (Game1.player.maxHealth) + " MaxHealth and, " + (Game1.player.MaxStamina) + " MaxStamina.", (LogLevel)(debugVal));
 		}
 		////////////////////////////////////////////////// CALCULATION METHODS //////////////////////////////////////////////////
 		private void CalculateBaseVitals()
 		{
-			this.newMaxHealth += this.Config.baseMaxHealth;
-			this.newMaxStamina += this.Config.baseMaxStamina;
+			int baseMaxHealth = this.Config.baseMaxHealth;
+			int baseMaxStamina = this.Config.baseMaxStamina;
+			this.newMaxHealth += baseMaxHealth;
+			this.newMaxStamina += baseMaxStamina;
 			this.removeVanillaHealth += vanillaMaxHealth;
 			this.removeVanillaStamina += vanillaMaxStamina;
+			base.Monitor.Log("New base Vitals are " + (baseMaxHealth) + " Health and, " + (baseMaxStamina) + " Stamina.", (LogLevel)(debugVal));
 		}
 
 		private void CalculateEventVitals()
 		{
 			if (this.Config.enableSnakeMilkVitals && Game1.player.mailReceived.Contains("qiCave"))
 			{
-				base.Monitor.Log("You drank Iridium Snake Milk", (LogLevel)1);
-				this.newMaxHealth += this.Config.snakeMilkHealthGain;
-				this.newMaxStamina += this.Config.snakeMilkStaminaGain;
+				int snakeMilkHealthGain = this.Config.snakeMilkHealthGain;
+				int snakeMilkStaminaGain = this.Config.snakeMilkStaminaGain;
+				this.newMaxHealth += snakeMilkHealthGain;
+				this.newMaxStamina += snakeMilkStaminaGain;
 				this.removeVanillaHealth += vanillaSnakeMilkHealth;
+				base.Monitor.Log("Iridium Snake Milk gave you " + (snakeMilkHealthGain) + " MaxHealth and, " + (snakeMilkStaminaGain) + " MaxStamina instead of " + (vanillaSnakeMilkHealth) + " MaxHealth.", (LogLevel)(debugVal));
 			}
 
 			if (this.Config.enableStardropVitals && Game1.player.MaxStamina > vanillaMaxStamina)
@@ -138,7 +151,8 @@ namespace FarmerVitalsEvolved
 				this.newMaxHealth += stardropHealth;
 				this.newMaxStamina += stardropStamina;
 				this.removeVanillaStamina += vanillaStardropStaminaTotal;
-				base.Monitor.Log("If calculations are correct you have collected " + stardropCount.ToString() + " Stardrop(s)", (LogLevel)1);
+				base.Monitor.Log("If calculations are correct you have collected " + (stardropCount.ToString()) + " Stardrop(s)", (LogLevel)(debugVal));
+				base.Monitor.Log("Stardrops are giving you " + (stardropHealth) + " MaxHealth and, " + (stardropStamina) + " MaxHealth instead of " + (vanillaStardropStaminaTotal), (LogLevel)(debugVal));
 				if (extraStamina != vanillaStardropStaminaTotal)
                 {
 					int staminaRemainder = extraStamina - vanillaStardropStaminaTotal;
@@ -154,7 +168,7 @@ namespace FarmerVitalsEvolved
 				int fighterHealth = this.Config.fighterHealthGain;
 				this.newMaxHealth += fighterHealth;
 				this.removeVanillaHealth += vanillaFighterHealth;
-				base.Monitor.Log("You have the fighter profession!", (LogLevel)3);
+				base.Monitor.Log("The Fighter profession is giving you " + (fighterHealth) + " MaxHealth instead of " + (vanillaFighterHealth) + ".", (LogLevel)(debugVal));
 			}
 
 			if (Game1.player.professions.Contains(27))
@@ -162,7 +176,7 @@ namespace FarmerVitalsEvolved
 				int defenderHealth = this.Config.defenderHealthGain;
 				this.newMaxHealth += defenderHealth;
 				this.removeVanillaHealth += vanillaDefenderHealth;
-				base.Monitor.Log("You have the defender profession!", (LogLevel)3);
+				base.Monitor.Log("The Defender profession is giving you " + (defenderHealth) + " MaxHealth instead of " + (vanillaDefenderHealth) + ".", (LogLevel)(debugVal));
 			}
 		}
 
@@ -201,6 +215,7 @@ namespace FarmerVitalsEvolved
 			int farmingStamina = (int)((float)farmingLevel * this.Config.farmingStaminaGain);
 			this.newMaxHealth += farmingHealth;
 			this.newMaxStamina += farmingStamina;
+			base.Monitor.Log("Farming Level " + (farmingLevel) + " is giving you " + (farmingHealth) + " MaxHealth and, " + (farmingStamina) + " MaxStamina.", (LogLevel)(debugVal));
 		}
 
 		private void CalculateMiningVitals()
@@ -210,6 +225,7 @@ namespace FarmerVitalsEvolved
 			int miningStamina = (int)((float)miningLevel * this.Config.miningStaminaGain);
 			this.newMaxHealth += miningHealth;
 			this.newMaxStamina += miningStamina;
+			base.Monitor.Log("Mining Level " + (miningLevel) + " is giving you " + (miningHealth) + " MaxHealth and, " + (miningStamina) + " MaxStamina.", (LogLevel)(debugVal));
 		}
 
 		private void CalculateForagingVitals()
@@ -219,6 +235,7 @@ namespace FarmerVitalsEvolved
 			int foragingStamina = (int)((float)foragingLevel * this.Config.foragingStaminaGain);
 			this.newMaxHealth += foragingHealth;
 			this.newMaxStamina += foragingStamina;
+			base.Monitor.Log("Farming Level " + (foragingLevel) + " is giving you " + (foragingHealth) + " MaxHealth and, " + (foragingStamina) + " MaxStamina.", (LogLevel)(debugVal));
 		}
 
 		private void CalculateFishingVitals()
@@ -228,6 +245,7 @@ namespace FarmerVitalsEvolved
 			int fishingStamina = (int)((float)fishingLevel * this.Config.fishingStaminaGain);
 			this.newMaxHealth += fishingHealth;
 			this.newMaxStamina += fishingStamina;
+			base.Monitor.Log("Farming Level " + (fishingLevel) + " is giving you " + (fishingHealth) + " MaxHealth and, " + (fishingStamina) + " MaxStamina.", (LogLevel)(debugVal));
 		}
 
 		private void CalculateCombatVitals()
@@ -239,26 +257,30 @@ namespace FarmerVitalsEvolved
 			if (this.Config.overrideVanillaCombatHealth == false)
 			{
 				base.Monitor.Log("Using vanilla combat health progression, 5 health gained every level except level 5 and 10", (LogLevel)1);
+				base.Monitor.Log("Combat Level " + (combatLevel) + " is giving you " + (combatStamina) + " MaxStamina.", (LogLevel)(debugVal));
 			}
 			else
 			{
 				int combatHealth = (int)((float)combatLevel * this.Config.combatHealthGain);
+				int tempCombatLevel = combatLevel;
 				this.newMaxHealth += combatHealth;
-				if (combatLevel >= 10)
+				if (tempCombatLevel >= 10)
 				{
-					combatLevel -= 2;
+					tempCombatLevel -= 2;
 				}
 				else
 				{
-					if (combatLevel >= 5)
+					if (tempCombatLevel >= 5)
 					{
-						combatLevel-= 1;
+						tempCombatLevel -= 1;
 					}
 				}
-				int vanillaCombatHealth = combatLevel * vanillaCombatHealthGain;
+				int vanillaCombatHealth = tempCombatLevel * vanillaCombatHealthGain;
 				this.removeVanillaHealth += vanillaCombatHealth;
-				base.Monitor.Log(vanillaCombatHealth.ToString() + " Health to be removed from Combat Levels", (LogLevel)2);
+				base.Monitor.Log("Combat Level " + (combatLevel) + " is giving you " + (combatHealth) + " MaxHealth and, " + (combatStamina) + " MaxStamina.", (LogLevel)(debugVal));
+				base.Monitor.Log(vanillaCombatHealth.ToString() + " Health removed from Vanilla Combat progression", (LogLevel)2);
 			}
+
 		}
 		////////////////////////////////////////////////// MISC METHODS //////////////////////////////////////////////////
 		private void ResetVariables()
@@ -269,8 +291,27 @@ namespace FarmerVitalsEvolved
 			this.removeVanillaStamina = 0;
 		}
 
+		private void DebugToggle()
+        {
+			if (this.Config.enableDebug)
+			{
+				debugVal = 1;
+			}
+			else
+			{
+				debugVal = 0;
+			}
+		}
+
+		private void OnTitleScreen(object sender, ReturnedToTitleEventArgs e)
+        {
+			DebugToggle(); // Checks to see if you changed the setting in GMCM
+        }
+
 		public void OnGameLaunched(object sender, GameLaunchedEventArgs e)
 		{
+			DebugToggle();
+
 			// get Generic Mod Config Menu's API (if it's installed)
 			var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
 			if (configMenu is null)
@@ -289,6 +330,14 @@ namespace FarmerVitalsEvolved
 				tooltip: () => null,
 				getValue: () => this.Config.enableMod,
 				setValue: value => this.Config.enableMod = value
+			);
+			// DEBUG TOGGLE
+			configMenu.AddBoolOption(
+				mod: this.ModManifest,
+				name: () => "Debug Log",
+				tooltip: () => "Shows mod calculations in the SMAPI log.",
+				getValue: () => this.Config.enableDebug,
+				setValue: value => this.Config.enableDebug = value
 			);
 			// TITLE BASE VITALS
 			configMenu.AddSectionTitle(
