@@ -1,5 +1,4 @@
-﻿using System;
-using StardewModdingAPI;
+﻿using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 
@@ -9,12 +8,16 @@ namespace FarmerVitalsEvolved
 	{
 		private ModConfig Config;
 		private int debugVal;
+
 		private int newMaxHealth;
 		private int newMaxStamina;
 		private int removeVanillaHealth;
 		private int removeVanillaStamina;
 		private int vitalsMaxHealth;
 		private int vitalsMaxStamina;
+		private int savedHealth;
+		private int savedStamina;
+
 		private const int vanillaCombatHealthGain = 5;
 		private const int vanillaMaxHealth = 100;
 		private const int vanillaMaxStamina = 270;
@@ -25,140 +28,134 @@ namespace FarmerVitalsEvolved
 		////////////////////////////////////////////////// MOD INITIALIZING //////////////////////////////////////////////////
 		public override void Entry(IModHelper helper)
 		{
-			this.Config = base.Helper.ReadConfig<ModConfig>();
-			helper.Events.GameLoop.GameLaunched += this.OnGameLaunched;
-			helper.Events.GameLoop.DayEnding += this.DayEndGameLoop;
-			helper.Events.GameLoop.DayStarted += this.DayStartGameLoop;
+			Config = Helper.ReadConfig<ModConfig>();
+
+			helper.Events.GameLoop.GameLaunched += OnGameLaunched;
+			helper.Events.GameLoop.DayEnding += OnDayEnding;
+			helper.Events.GameLoop.Saving += OnSaving;
+			helper.Events.GameLoop.DayStarted += OnDayStarted;
+		}
+
+		public void OnGameLaunched(object sender, GameLaunchedEventArgs e)
+        {
+			GenerateConfigMenu();
+			DebugToggle();
 		}
 		////////////////////////////////////////////////// MAIN MOD LOOP //////////////////////////////////////////////////
-		private void DayStartGameLoop(object sender, DayStartedEventArgs e)
+		private void OnDayStarted(object sender, DayStartedEventArgs e)
 		{
-			this.DebugToggle();
+			WorldReadyCheck();
+            Monitor.Log("New Day, Calculating Vitals...", (LogLevel)debugVal);
+			CalculateMaxVitals();
+			ApplyNewMaxVitals();
+			ApplyVitals();
+		}
 
-			if (this.Config.enableMod == false)
+		private void OnDayEnding(object sender, DayEndingEventArgs e)
+		{
+			WorldReadyCheck();
+			SaveCurrentVitals();
+			RevertVitals();
+		}
+
+		private void OnSaving(object sender, SavingEventArgs e) // Alter Current health here
+        {
+			if (Config.enableSleepVitals)
             {
-				base.Monitor.Log("Mod is currently disabled.", (LogLevel)3);
-				return;
+				if (savedHealth != 0)
+                {
+					Game1.player.health = savedHealth;
+                }
+				if (savedStamina != 0)
+                {
+					Game1.player.stamina = savedStamina;
+                }
             }
-			
-			if (!Context.IsWorldReady)
-			{
-				base.Monitor.Log("World loaded before calculations could be made.", (LogLevel)4);
-				return;
-			}
-			else
-			{
-				base.Monitor.Log("New Day, Calculating Vitals...", (LogLevel)(debugVal++));
-				this.CalculateMaxVitals();
-				this.ApplyNewMaxVitals();
-				this.ApplyVitals();
-			}
 		}
 
-		private void DayEndGameLoop(object sender, DayEndingEventArgs e)
-		{
-			if (!Context.IsWorldReady || this.Config.enableMod == false)
-			{
-				return;
-			}
-			else
-			{
-				this.RemoveNewMaxVitals();
-			}
-		}
 		////////////////////////////////////////////////// MAIN METHODS //////////////////////////////////////////////////
 		private void CalculateMaxVitals()
 		{
 			ResetVariables();
 
-			if (!Context.IsWorldReady)
-			{
-				base.Monitor.Log("World loaded before Max Vitals could be calculated.", (LogLevel)4);
-				return;
-			}
-			else
-			{
-				this.CalculateEventVitals();
-				this.CalculateSkillVitals();
+			CalculateEventVitals();
+			CalculateSkillVitals();
 
-				if (this.Config.enableBaseVitals)
-				{
-					this.CalculateBaseVitals();
-				}
-
-				if (this.Config.enableProfessionVitals && (Game1.player.professions.Contains(24)))
-				{
-					this.CalculateProfessionVitals();
-				}
-				base.Monitor.Log((Game1.player.maxHealth) + " MaxHealth and, " + (Game1.player.MaxStamina) + " MaxStamina before calculations.", (LogLevel)(debugVal));
-				base.Monitor.Log((removeVanillaHealth) + " Vanilla MaxHealth removed, " + (removeVanillaStamina) + " Vanilla MaxStamina removed.", (LogLevel)(debugVal));
-				base.Monitor.Log((newMaxHealth) + " MaxHealth added, " + (newMaxStamina) + " MaxStamina added.", (LogLevel)(debugVal));
-				this.vitalsMaxHealth = this.newMaxHealth - this.removeVanillaHealth;
-				this.vitalsMaxStamina = this.newMaxStamina - this.removeVanillaStamina;
-				base.Monitor.Log((vitalsMaxHealth) + " MaxHealth difference, " + (vitalsMaxStamina) + "  MaxStamina difference.", (LogLevel)(debugVal));
+			if (Config.enableBaseVitals)
+			{
+				CalculateBaseVitals();
 			}
+
+			if (Config.enableCombatProfessionVitals && Game1.player.professions.Contains(24))
+			{
+				CalculateProfessionVitals();
+			}
+
+			vitalsMaxHealth = newMaxHealth - removeVanillaHealth;
+			vitalsMaxStamina = newMaxStamina - removeVanillaStamina;
+			VitalsSummary();
 		}
 
 		private void ApplyNewMaxVitals()
 		{
-			Game1.player.maxHealth += this.vitalsMaxHealth;
-			Game1.player.MaxStamina += this.vitalsMaxStamina;
-			base.Monitor.Log("Player now has " + (Game1.player.maxHealth) + " MaxHealth and, " + (Game1.player.MaxStamina) + " MaxStamina." , (LogLevel)(debugVal));
+			Game1.player.maxHealth += vitalsMaxHealth;
+			Game1.player.MaxStamina += vitalsMaxStamina;
+            Monitor.Log("Player now has " + Game1.player.maxHealth + " MaxHealth and, " + Game1.player.MaxStamina + " MaxStamina." , (LogLevel)debugVal);
 		}
 
 		private void ApplyVitals()
 		{
-			Game1.player.health += this.vitalsMaxHealth;
-			Game1.player.stamina += (float)this.vitalsMaxStamina;
+			Game1.player.health += Game1.player.maxHealth;
+			Game1.player.stamina += Game1.player.MaxStamina;
 		}
 
-		private void RemoveNewMaxVitals()
+		private void RevertVitals()
 		{
-			base.Monitor.Log("Removing Vitals before saving...", (LogLevel)(debugVal));
-			Game1.player.maxHealth -= this.vitalsMaxHealth;
-			Game1.player.MaxStamina -= this.vitalsMaxStamina;
-			base.Monitor.Log("Player now has " + (Game1.player.maxHealth) + " MaxHealth and, " + (Game1.player.MaxStamina) + " MaxStamina.", (LogLevel)(debugVal));
+            Monitor.Log("Removing Vitals before saving...", (LogLevel)debugVal);
+			Game1.player.maxHealth -= vitalsMaxHealth;
+			Game1.player.MaxStamina -= vitalsMaxStamina;
+            Monitor.Log("Player now has " + Game1.player.maxHealth + " MaxHealth and, " + Game1.player.MaxStamina + " MaxStamina.", (LogLevel)debugVal);
 		}
 		////////////////////////////////////////////////// CALCULATION METHODS //////////////////////////////////////////////////
 		private void CalculateBaseVitals()
 		{
-			int baseMaxHealth = this.Config.baseMaxHealth;
-			int baseMaxStamina = this.Config.baseMaxStamina;
-			this.newMaxHealth += baseMaxHealth;
-			this.newMaxStamina += baseMaxStamina;
-			this.removeVanillaHealth += vanillaMaxHealth;
-			this.removeVanillaStamina += vanillaMaxStamina;
-			base.Monitor.Log("New base Vitals are " + (baseMaxHealth) + " Health and, " + (baseMaxStamina) + " Stamina.", (LogLevel)(debugVal));
+			int baseMaxHealth = Config.baseMaxHealth;
+			int baseMaxStamina = Config.baseMaxStamina;
+			newMaxHealth += baseMaxHealth;
+			newMaxStamina += baseMaxStamina;
+			removeVanillaHealth += vanillaMaxHealth;
+			removeVanillaStamina += vanillaMaxStamina;
+            Monitor.Log("New base Vitals are " + baseMaxHealth + " Health and, " + baseMaxStamina + " Stamina.", (LogLevel)debugVal);
 		}
 
 		private void CalculateEventVitals()
 		{
-			if (this.Config.enableSnakeMilkVitals && Game1.player.mailReceived.Contains("qiCave"))
+			if (Config.enableSnakeMilkVitals && Game1.player.mailReceived.Contains("qiCave"))
 			{
-				int snakeMilkHealthGain = this.Config.snakeMilkHealthGain;
-				int snakeMilkStaminaGain = this.Config.snakeMilkStaminaGain;
-				this.newMaxHealth += snakeMilkHealthGain;
-				this.newMaxStamina += snakeMilkStaminaGain;
-				this.removeVanillaHealth += vanillaSnakeMilkHealth;
-				base.Monitor.Log("Iridium Snake Milk gave you " + (snakeMilkHealthGain) + " MaxHealth and, " + (snakeMilkStaminaGain) + " MaxStamina instead of " + (vanillaSnakeMilkHealth) + " MaxHealth.", (LogLevel)(debugVal));
+				int snakeMilkHealthGain = Config.snakeMilkHealthGain;
+				int snakeMilkStaminaGain = Config.snakeMilkStaminaGain;
+				newMaxHealth += snakeMilkHealthGain;
+				newMaxStamina += snakeMilkStaminaGain;
+				removeVanillaHealth += vanillaSnakeMilkHealth;
+                Monitor.Log("Iridium Snake Milk gave you " + snakeMilkHealthGain + " MaxHealth and, " + snakeMilkStaminaGain + " MaxStamina instead of " + vanillaSnakeMilkHealth + " MaxHealth.", (LogLevel)debugVal);
 			}
 
-			if (this.Config.enableStardropVitals && Game1.player.MaxStamina > vanillaMaxStamina)
+			if (Config.enableStardropVitals && Game1.player.MaxStamina > vanillaMaxStamina)
 			{
 				int extraStamina = Game1.player.MaxStamina - vanillaMaxStamina;
 				int stardropCount = extraStamina / vanillaStardropStamina;
 				int vanillaStardropStaminaTotal = stardropCount * vanillaStardropStamina;
-				int stardropHealth = stardropCount * this.Config.stardropHealthGain;
-				int stardropStamina = stardropCount * this.Config.stardropStaminaGain;
-				this.newMaxHealth += stardropHealth;
-				this.newMaxStamina += stardropStamina;
-				this.removeVanillaStamina += vanillaStardropStaminaTotal;
-				base.Monitor.Log("If calculations are correct you have collected " + (stardropCount.ToString()) + " Stardrop(s)", (LogLevel)(debugVal));
-				base.Monitor.Log("Stardrops are giving you " + (stardropHealth) + " MaxHealth and, " + (stardropStamina) + " MaxHealth instead of " + (vanillaStardropStaminaTotal), (LogLevel)(debugVal));
+				int stardropHealth = stardropCount * Config.stardropHealthGain;
+				int stardropStamina = stardropCount * Config.stardropStaminaGain;
+				newMaxHealth += stardropHealth;
+				newMaxStamina += stardropStamina;
+				removeVanillaStamina += vanillaStardropStaminaTotal;
+                Monitor.Log("If calculations are correct you have collected " + stardropCount.ToString() + " Stardrop(s)", (LogLevel)debugVal);
+                Monitor.Log("Stardrops are giving you " + stardropHealth + " MaxHealth and, " + stardropStamina + " MaxHealth instead of " + vanillaStardropStaminaTotal, (LogLevel)debugVal);
 				if (extraStamina != vanillaStardropStaminaTotal)
                 {
 					int staminaRemainder = extraStamina - vanillaStardropStaminaTotal;
-					base.Monitor.Log(staminaRemainder.ToString() + " Stamina remaining after Stardrop calculations, are you getting stamina from other sources?", (LogLevel)3);
+                    Monitor.Log(staminaRemainder.ToString() + " Stamina remaining after Stardrop calculations, are you getting stamina from other sources?", (LogLevel)3);
 				}
 			}
 		}
@@ -167,105 +164,105 @@ namespace FarmerVitalsEvolved
 		{
 			if (Game1.player.professions.Contains(24))
 			{
-				int fighterHealth = this.Config.fighterHealthGain;
-				this.newMaxHealth += fighterHealth;
-				this.removeVanillaHealth += vanillaFighterHealth;
-				base.Monitor.Log("The Fighter profession is giving you " + (fighterHealth) + " MaxHealth instead of " + (vanillaFighterHealth) + ".", (LogLevel)(debugVal));
+				int fighterHealth = Config.fighterHealthGain;
+				newMaxHealth += fighterHealth;
+				removeVanillaHealth += vanillaFighterHealth;
+                Monitor.Log("The Fighter profession is giving you " + fighterHealth + " MaxHealth instead of " + vanillaFighterHealth + ".", (LogLevel)debugVal);
 			}
 
 			if (Game1.player.professions.Contains(27))
 			{
-				int defenderHealth = this.Config.defenderHealthGain;
-				this.newMaxHealth += defenderHealth;
-				this.removeVanillaHealth += vanillaDefenderHealth;
-				base.Monitor.Log("The Defender profession is giving you " + (defenderHealth) + " MaxHealth instead of " + (vanillaDefenderHealth) + ".", (LogLevel)(debugVal));
+				int defenderHealth = Config.defenderHealthGain;
+				newMaxHealth += defenderHealth;
+				removeVanillaHealth += vanillaDefenderHealth;
+                Monitor.Log("The Defender profession is giving you " + defenderHealth + " MaxHealth instead of " + vanillaDefenderHealth + ".", (LogLevel)debugVal);
 			}
 		}
 
 		private void CalculateSkillVitals()
 		{
-			if (this.Config.enableFarmingVitals)
+			if (Config.enableFarmingVitals)
 			{
-				this.CalculateFarmingVitals();
+				CalculateFarmingVitals();
 			}
 
-			if (this.Config.enableMiningVitals)
+			if (Config.enableMiningVitals)
 			{
-				this.CalculateMiningVitals();
+				CalculateMiningVitals();
 			}
 
-			if (this.Config.enableForagingVitals)
+			if (Config.enableForagingVitals)
 			{
-				this.CalculateForagingVitals();
+				CalculateForagingVitals();
 			}
 
-			if (this.Config.enableFishingVitals)
+			if (Config.enableFishingVitals)
 			{
-				this.CalculateFishingVitals();
+				CalculateFishingVitals();
 			}
 
-			if (this.Config.enableCombatVitals)
+			if (Config.enableCombatVitals)
 			{
-				this.CalculateCombatVitals();
+				CalculateCombatVitals();
 			}
 		}
 
 		private void CalculateFarmingVitals()
 		{
 			int farmingLevel = Game1.player.FarmingLevel;
-			int farmingHealth = (int)((float)farmingLevel * this.Config.farmingHealthGain);
-			int farmingStamina = (int)((float)farmingLevel * this.Config.farmingStaminaGain);
-			this.newMaxHealth += farmingHealth;
-			this.newMaxStamina += farmingStamina;
-			base.Monitor.Log("Farming Level " + (farmingLevel) + " is giving you " + (farmingHealth) + " MaxHealth and, " + (farmingStamina) + " MaxStamina.", (LogLevel)(debugVal));
+			int farmingHealth = (int)((float)farmingLevel * Config.farmingHealthGain);
+			int farmingStamina = (int)((float)farmingLevel * Config.farmingStaminaGain);
+			newMaxHealth += farmingHealth;
+			newMaxStamina += farmingStamina;
+            Monitor.Log("Farming Level " + farmingLevel + " is giving you " + farmingHealth + " MaxHealth and, " + farmingStamina + " MaxStamina.", (LogLevel)debugVal);
 		}
 
 		private void CalculateMiningVitals()
 		{
 			int miningLevel = Game1.player.MiningLevel;
-			int miningHealth = (int)((float)miningLevel * this.Config.miningHealthGain);
-			int miningStamina = (int)((float)miningLevel * this.Config.miningStaminaGain);
-			this.newMaxHealth += miningHealth;
-			this.newMaxStamina += miningStamina;
-			base.Monitor.Log("Mining Level " + (miningLevel) + " is giving you " + (miningHealth) + " MaxHealth and, " + (miningStamina) + " MaxStamina.", (LogLevel)(debugVal));
+			int miningHealth = (int)((float)miningLevel * Config.miningHealthGain);
+			int miningStamina = (int)((float)miningLevel * Config.miningStaminaGain);
+			newMaxHealth += miningHealth;
+			newMaxStamina += miningStamina;
+            Monitor.Log("Mining Level " + miningLevel + " is giving you " + miningHealth + " MaxHealth and, " + miningStamina + " MaxStamina.", (LogLevel)debugVal);
 		}
 
 		private void CalculateForagingVitals()
 		{
 			int foragingLevel = Game1.player.ForagingLevel;
-			int foragingHealth = (int)((float)foragingLevel * this.Config.foragingHealthGain);
-			int foragingStamina = (int)((float)foragingLevel * this.Config.foragingStaminaGain);
-			this.newMaxHealth += foragingHealth;
-			this.newMaxStamina += foragingStamina;
-			base.Monitor.Log("Farming Level " + (foragingLevel) + " is giving you " + (foragingHealth) + " MaxHealth and, " + (foragingStamina) + " MaxStamina.", (LogLevel)(debugVal));
+			int foragingHealth = (int)((float)foragingLevel * Config.foragingHealthGain);
+			int foragingStamina = (int)((float)foragingLevel * Config.foragingStaminaGain);
+			newMaxHealth += foragingHealth;
+			newMaxStamina += foragingStamina;
+            Monitor.Log("Farming Level " + foragingLevel + " is giving you " + foragingHealth + " MaxHealth and, " + foragingStamina + " MaxStamina.", (LogLevel)debugVal);
 		}
 
 		private void CalculateFishingVitals()
 		{
 			int fishingLevel = Game1.player.FishingLevel;
-			int fishingHealth = (int)((float)fishingLevel * this.Config.fishingHealthGain);
-			int fishingStamina = (int)((float)fishingLevel * this.Config.fishingStaminaGain);
-			this.newMaxHealth += fishingHealth;
-			this.newMaxStamina += fishingStamina;
-			base.Monitor.Log("Farming Level " + (fishingLevel) + " is giving you " + (fishingHealth) + " MaxHealth and, " + (fishingStamina) + " MaxStamina.", (LogLevel)(debugVal));
+			int fishingHealth = (int)((float)fishingLevel * Config.fishingHealthGain);
+			int fishingStamina = (int)((float)fishingLevel * Config.fishingStaminaGain);
+			newMaxHealth += fishingHealth;
+			newMaxStamina += fishingStamina;
+            Monitor.Log("Farming Level " + fishingLevel + " is giving you " + fishingHealth + " MaxHealth and, " + fishingStamina + " MaxStamina.", (LogLevel)debugVal);
 		}
 
 		private void CalculateCombatVitals()
 		{
 			int combatLevel = Game1.player.CombatLevel;
-			int combatStamina = (int)((float)combatLevel * this.Config.combatStaminaGain);
-			this.newMaxStamina += combatStamina;
+			int combatStamina = (int)((float)combatLevel * Config.combatStaminaGain);
+			newMaxStamina += combatStamina;
 
-			if (this.Config.overrideVanillaCombatHealth == false)
+			if (Config.overrideVanillaCombatHealth == false)
 			{
-				base.Monitor.Log("Using vanilla combat health progression, 5 health gained every level except level 5 and 10", (LogLevel)1);
-				base.Monitor.Log("Combat Level " + (combatLevel) + " is giving you " + (combatStamina) + " MaxStamina.", (LogLevel)(debugVal));
+                Monitor.Log("Using vanilla combat health progression, 5 health gained every level except level 5 and 10", (LogLevel)1);
+                Monitor.Log("Combat Level " + combatLevel + " is giving you " + combatStamina + " MaxStamina.", (LogLevel)debugVal);
 			}
 			else
 			{
-				int combatHealth = (int)((float)combatLevel * this.Config.combatHealthGain);
+				int combatHealth = (int)((float)combatLevel * Config.combatHealthGain);
 				int tempCombatLevel = combatLevel;
-				this.newMaxHealth += combatHealth;
+				newMaxHealth += combatHealth;
 				if (tempCombatLevel >= 10)
 				{
 					tempCombatLevel -= 2;
@@ -278,24 +275,42 @@ namespace FarmerVitalsEvolved
 					}
 				}
 				int vanillaCombatHealth = tempCombatLevel * vanillaCombatHealthGain;
-				this.removeVanillaHealth += vanillaCombatHealth;
-				base.Monitor.Log("Combat Level " + (combatLevel) + " is giving you " + (combatHealth) + " MaxHealth and, " + (combatStamina) + " MaxStamina.", (LogLevel)(debugVal));
-				base.Monitor.Log(vanillaCombatHealth.ToString() + " Health removed from Vanilla Combat progression", (LogLevel)(debugVal));
+				removeVanillaHealth += vanillaCombatHealth;
+                Monitor.Log("Combat Level " + combatLevel + " is giving you " + combatHealth + " MaxHealth and, " + combatStamina + " MaxStamina.", (LogLevel)debugVal);
+                Monitor.Log(vanillaCombatHealth.ToString() + " Health removed from Vanilla Combat progression", (LogLevel)debugVal);
 			}
 
 		}
 		////////////////////////////////////////////////// MISC METHODS //////////////////////////////////////////////////
+		private void SaveCurrentVitals()
+        {
+			if (Config.enableSleepVitals)
+            {
+				savedHealth = Game1.player.health;
+				savedStamina = (int)Game1.player.stamina;
+				Monitor.Log("Ending night with " + savedHealth + " Health and " + savedStamina + " Stamina.", (LogLevel)debugVal);
+			}
+        }
+
 		private void ResetVariables()
 		{
-			this.newMaxHealth = 0;
-			this.newMaxStamina = 0;
-			this.removeVanillaHealth = 0;
-			this.removeVanillaStamina = 0;
+			newMaxHealth = 0;
+			newMaxStamina = 0;
+			removeVanillaHealth = 0;
+			removeVanillaStamina = 0;
+		}
+
+		private void WorldReadyCheck()
+        {
+			if (!Context.IsWorldReady || !Config.enableMod)
+			{
+				return;
+			}
 		}
 
 		private void DebugToggle()
         {
-			if (this.Config.enableDebug)
+			if (Config.enableDebug)
 			{
 				debugVal = 1;
 			}
@@ -305,312 +320,402 @@ namespace FarmerVitalsEvolved
 			}
 		}
 
-		public void OnGameLaunched(object sender, GameLaunchedEventArgs e)
+		private void VitalsSummary()
+        {
+			Monitor.Log(Game1.player.maxHealth + " MaxHealth and, " + Game1.player.MaxStamina + " MaxStamina before calculations.", (LogLevel)debugVal);
+			Monitor.Log(removeVanillaHealth + " Vanilla MaxHealth removed, " + removeVanillaStamina + " Vanilla MaxStamina removed.", (LogLevel)debugVal);
+			Monitor.Log(newMaxHealth + " MaxHealth added, " + newMaxStamina + " MaxStamina added.", (LogLevel)debugVal);
+			Monitor.Log(vitalsMaxHealth + " MaxHealth difference, " + vitalsMaxStamina + "  MaxStamina difference.", (LogLevel)debugVal);
+		}
+		////////////////////////////////////////////////// CONFIG MENU //////////////////////////////////////////////////
+		public void GenerateConfigMenu()
 		{
 			// get Generic Mod Config Menu's API (if it's installed)
-			var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+			var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
 			if (configMenu is null)
 				return;
 
-			// register mod
+			// REGISTER MOD
 			configMenu.Register(
-				mod: this.ModManifest,
-				reset: () => this.Config = new ModConfig(),
-				save: () => this.Helper.WriteConfig(this.Config)
+				mod: ModManifest,
+				reset: () => Config = new ModConfig(),
+				save: () => Helper.WriteConfig(Config)
 			);
 			// MOD TOGGLE
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Mod Enabled",
 				tooltip: () => null,
-				getValue: () => this.Config.enableMod,
-				setValue: value => this.Config.enableMod = value
+				getValue: () => Config.enableMod,
+				setValue: value => Config.enableMod = value
 			);
 			// DEBUG TOGGLE
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Debug Log",
 				tooltip: () => "Shows mod calculations in the SMAPI log.",
-				getValue: () => this.Config.enableDebug,
-				setValue: value => this.Config.enableDebug = value
+				getValue: () => Config.enableDebug,
+				setValue: value => Config.enableDebug = value
+			);
+			// BASE VITALS PAGE
+			configMenu.AddPageLink(
+				mod: ModManifest,
+				pageId: "sensakuma.base",
+				text: () => "Base Vitals Settings",
+				tooltip: () => null
+			);
+			// SKILL PAGE
+			configMenu.AddPageLink(
+				mod: ModManifest,
+				pageId: "sensakuma.skill",
+				text: () => "Skill Vitals Settings",
+				tooltip: () => null
+			);
+			// PROFESSIONS PAGE
+			configMenu.AddPageLink(
+				mod: ModManifest,
+				pageId: "sensakuma.profession",
+				text: () => "Profession Vitals Settings",
+				tooltip: () => null
+			);
+			// PROFESSIONS PAGE
+			configMenu.AddPageLink(
+				mod: ModManifest,
+				pageId: "sensakuma.healing",
+				text: () => "Healing Vitals Settings",
+				tooltip: () => null
+			);
+			////////////////////////////////////////////////// MAIN VITALS //////////////////////////////////////////////////
+			configMenu.AddPage(
+				mod: ModManifest,
+				pageId: "sensakuma.base",
+				pageTitle: () => "Base"
 			);
 			// TITLE BASE VITALS
 			configMenu.AddSectionTitle(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				text: () => "Base Vitals",
 				tooltip: () => "Change starting Health and Stamina."
 			);
 			// ENABLE BASE VITALS
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Enabled",
 				tooltip: () => null,
-				getValue: () => this.Config.enableBaseVitals,
-				setValue: value => this.Config.enableBaseVitals = value
+				getValue: () => Config.enableBaseVitals,
+				setValue: value => Config.enableBaseVitals = value
 			);
 			// CHOOSE BASE HEALTH
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Base Max Health",
 				tooltip: () => "Health at the start of the game. (Vanilla is 100)",
-				getValue: () => this.Config.baseMaxHealth,
-				setValue: value => this.Config.baseMaxHealth = value
+				getValue: () => Config.baseMaxHealth,
+				setValue: value => Config.baseMaxHealth = value
 			);
 			// CHOOSE BASE STAMINA
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Base Max Stamina",
 				tooltip: () => "Stamina at the start of the game. (Vanilla is 270)",
-				getValue: () => this.Config.baseMaxStamina,
-				setValue: value => this.Config.baseMaxStamina = value
+				getValue: () => Config.baseMaxStamina,
+				setValue: value => Config.baseMaxStamina = value
 			);
 			// TITLE STARDROP VITALS
 			configMenu.AddSectionTitle(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				text: () => "Stardrop Vitals",
 				tooltip: () => "Change Health and Stamina gained from Stardrops."
 			);
 			// ENABLE STARDROP VITALS
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Enabled",
 				tooltip: () => null,
-				getValue: () => this.Config.enableStardropVitals,
-				setValue: value => this.Config.enableStardropVitals = value
+				getValue: () => Config.enableStardropVitals,
+				setValue: value => Config.enableStardropVitals = value
 			);
 			// STARDROP HEALTH VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Stardrop Health",
 				tooltip: () => "Health gained from consuming a Stardrop. (Vanilla is 0)",
-				getValue: () => this.Config.stardropHealthGain,
-				setValue: value => this.Config.stardropHealthGain = value
+				getValue: () => Config.stardropHealthGain,
+				setValue: value => Config.stardropHealthGain = value
 			);
 			// STARDROP STAMINA VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Stardrop Stamina",
 				tooltip: () => "Stamina gained from consuming a Stardrop. (Vanilla is 34)",
-				getValue: () => this.Config.stardropStaminaGain,
-				setValue: value => this.Config.stardropStaminaGain = value
+				getValue: () => Config.stardropStaminaGain,
+				setValue: value => Config.stardropStaminaGain = value
 			);
 			// TITLE IRIDIUM SNAKE MILK VITALS
 			configMenu.AddSectionTitle(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				text: () => "Iridium Snake Milk Vitals",
 				tooltip: () => "Change Health and Stamina gained from Iridium Snake Milk."
 			);
 			// ENABLE IRIDIUM SNAKE MILK VITALS
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Enable",
 				tooltip: () => null,
-				getValue: () => this.Config.enableSnakeMilkVitals,
-				setValue: value => this.Config.enableSnakeMilkVitals = value
+				getValue: () => Config.enableSnakeMilkVitals,
+				setValue: value => Config.enableSnakeMilkVitals = value
 			);
 			// IRIDIUM SNAKE MILK HEALTH VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Snake Milk Health",
 				tooltip: () => "Health gained from consuming a Iridium Snake Milk. (Vanilla is 25)",
-				getValue: () => this.Config.snakeMilkHealthGain,
-				setValue: value => this.Config.snakeMilkHealthGain = value
+				getValue: () => Config.snakeMilkHealthGain,
+				setValue: value => Config.snakeMilkHealthGain = value
 			);
 			// IRIDIUM SNAKE MILK STAMINA VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Snake Milk Stamina",
 				tooltip: () => "Stamina gained from consuming a Iridium Snake Milk. (Vanilla is 0)",
-				getValue: () => this.Config.snakeMilkStaminaGain,
-				setValue: value => this.Config.snakeMilkStaminaGain = value
+				getValue: () => Config.snakeMilkStaminaGain,
+				setValue: value => Config.snakeMilkStaminaGain = value
+			);
+			////////////////////////////////////////////////// PROFESSION VITALS //////////////////////////////////////////////////
+			configMenu.AddPage(
+				mod: ModManifest,
+				pageId: "sensakuma.profession",
+				pageTitle: () => "Professions"
 			);
 			// TITLE PROFESSION VITALS
 			configMenu.AddSectionTitle(
-				mod: this.ModManifest,
-				text: () => "Profession Vitals",
+				mod: ModManifest,
+				text: () => "Combat Profession Vitals",
 				tooltip: () => "Change Health gained from Fighter and Defender Professions."
 			);
 			// ENABLE PROFESSION VITALS
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Enabled",
 				tooltip: () => null,
-				getValue: () => this.Config.enableProfessionVitals,
-				setValue: value => this.Config.enableProfessionVitals = value
+				getValue: () => Config.enableCombatProfessionVitals,
+				setValue: value => Config.enableCombatProfessionVitals = value
 			);
 			// FIGHTER HEALTH VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Fighter Health",
 				tooltip: () => "Health you gain from the Fighter Profession. (Vanilla is 15)",
-				getValue: () => this.Config.fighterHealthGain,
-				setValue: value => this.Config.fighterHealthGain = value
+				getValue: () => Config.fighterHealthGain,
+				setValue: value => Config.fighterHealthGain = value
 			);
 			// DEFENDER HEALTH VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Defender Health",
 				tooltip: () => "Health you gain from the Defender Profession. (Vanilla is 25)",
-				getValue: () => this.Config.defenderHealthGain,
-				setValue: value => this.Config.defenderHealthGain = value
+				getValue: () => Config.defenderHealthGain,
+				setValue: value => Config.defenderHealthGain = value
+			);
+			////////////////////////////////////////////////// SKILL VITALS //////////////////////////////////////////////////
+			configMenu.AddPage(
+				mod: ModManifest,
+				pageId: "sensakuma.skill",
+				pageTitle: () => "Skills"
 			);
 			// TITLE FARMING VITALS
 			configMenu.AddSectionTitle(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				text: () => "Farming Skill Vitals",
 				tooltip: () => "Gain Health and Stamina from Farming Levels."
 			);
 			// ENABLE FARMING VITALS
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Enable",
 				tooltip: () => null,
-				getValue: () => this.Config.enableFarmingVitals,
-				setValue: value => this.Config.enableFarmingVitals = value
+				getValue: () => Config.enableFarmingVitals,
+				setValue: value => Config.enableFarmingVitals = value
 			);
 			// FARMING HEALTH GAIN
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Health Per Level",
 				tooltip: () => null,
-				getValue: () => this.Config.farmingHealthGain,
-				setValue: value => this.Config.farmingHealthGain = value
+				getValue: () => Config.farmingHealthGain,
+				setValue: value => Config.farmingHealthGain = value
 			);
 			// FARMING STAMINA VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Stamina Per Level",
 				tooltip: () => null,
-				getValue: () => this.Config.farmingStaminaGain,
-				setValue: value => this.Config.farmingStaminaGain = value
+				getValue: () => Config.farmingStaminaGain,
+				setValue: value => Config.farmingStaminaGain = value
 			);
 			// TITLE MINING VITALS
 			configMenu.AddSectionTitle(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				text: () => "Mining Skill Vitals",
 				tooltip: () => "Gain Health and Stamina from Mining Levels."
 			);
 			// ENABLE MINING VITALS
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Enable",
 				tooltip: () => null,
-				getValue: () => this.Config.enableMiningVitals,
-				setValue: value => this.Config.enableMiningVitals = value
+				getValue: () => Config.enableMiningVitals,
+				setValue: value => Config.enableMiningVitals = value
 			);
 			// MINING HEALTH GAIN
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Health Per Level",
 				tooltip: () => null,
-				getValue: () => this.Config.miningHealthGain,
-				setValue: value => this.Config.miningHealthGain = value
+				getValue: () => Config.miningHealthGain,
+				setValue: value => Config.miningHealthGain = value
 			);
 			// MINING STAMINA VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Stamina Per Level",
 				tooltip: () => null,
-				getValue: () => this.Config.miningStaminaGain,
-				setValue: value => this.Config.miningStaminaGain = value
+				getValue: () => Config.miningStaminaGain,
+				setValue: value => Config.miningStaminaGain = value
 			);
 			// TITLE FORAGING VITALS
 			configMenu.AddSectionTitle(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				text: () => "Foraging Skill Vitals",
 				tooltip: () => "Gain Health and Stamina from Foraging Levels."
 			);
 			// ENABLE FORAGING VITALS
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Enable",
 				tooltip: () => null,
-				getValue: () => this.Config.enableForagingVitals,
-				setValue: value => this.Config.enableForagingVitals = value
+				getValue: () => Config.enableForagingVitals,
+				setValue: value => Config.enableForagingVitals = value
 			);
 			// FORAGING HEALTH GAIN
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Health Per Level",
 				tooltip: () => null,
-				getValue: () => this.Config.foragingHealthGain,
-				setValue: value => this.Config.foragingHealthGain = value
+				getValue: () => Config.foragingHealthGain,
+				setValue: value => Config.foragingHealthGain = value
 			);
 			// FORAGING STAMINA VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Stamina Per Level",
 				tooltip: () => null,
-				getValue: () => this.Config.foragingStaminaGain,
-				setValue: value => this.Config.foragingStaminaGain = value
+				getValue: () => Config.foragingStaminaGain,
+				setValue: value => Config.foragingStaminaGain = value
 			);
 			// TITLE FISHING VITALS
 			configMenu.AddSectionTitle(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				text: () => "Fishing Skill Vitals",
 				tooltip: () => "Gain Health and Stamina from Fishing Levels."
 			);
 			// ENABLE FISHING VITALS
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Enable",
 				tooltip: () => null,
-				getValue: () => this.Config.enableFishingVitals,
-				setValue: value => this.Config.enableFishingVitals = value
+				getValue: () => Config.enableFishingVitals,
+				setValue: value => Config.enableFishingVitals = value
 			);
 			// FISHING HEALTH GAIN
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Health Per Level",
 				tooltip: () => null,
-				getValue: () => this.Config.fishingHealthGain,
-				setValue: value => this.Config.fishingHealthGain = value
+				getValue: () => Config.fishingHealthGain,
+				setValue: value => Config.fishingHealthGain = value
 			);
 			// FISHING STAMINA VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Stamina Per Level",
 				tooltip: () => null,
-				getValue: () => this.Config.fishingStaminaGain,
-				setValue: value => this.Config.fishingStaminaGain = value
+				getValue: () => Config.fishingStaminaGain,
+				setValue: value => Config.fishingStaminaGain = value
 			);
 			// TITLE COMBAT VITALS
 			configMenu.AddSectionTitle(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				text: () => "Combat Skill Vitals",
 				tooltip: () => "Gain Health and Stamina from Combat Levels."
 			);
 			// ENABLE COMBAT VITALS
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Enable",
 				tooltip: () => null,
-				getValue: () => this.Config.enableCombatVitals,
-				setValue: value => this.Config.enableCombatVitals = value
+				getValue: () => Config.enableCombatVitals,
+				setValue: value => Config.enableCombatVitals = value
 			);
 			// OVERRIDE VANILLA COMBAT HEALTH
 			configMenu.AddBoolOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Override Vanilla Health",
 				tooltip: () => "Vanilla behavior gives (5) health every level except for levels (5 & 10).",
-				getValue: () => this.Config.overrideVanillaCombatHealth,
-				setValue: value => this.Config.overrideVanillaCombatHealth = value
+				getValue: () => Config.overrideVanillaCombatHealth,
+				setValue: value => Config.overrideVanillaCombatHealth = value
 			);
 			// COMBAT HEALTH GAIN
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Health Per Level",
 				tooltip: () => "Only in effect if Override Vanilla Health is True",
-				getValue: () => this.Config.combatHealthGain,
-				setValue: value => this.Config.combatHealthGain = value
+				getValue: () => Config.combatHealthGain,
+				setValue: value => Config.combatHealthGain = value
 			);
 			// COMBAT STAMINA VALUE
 			configMenu.AddNumberOption(
-				mod: this.ModManifest,
+				mod: ModManifest,
 				name: () => "Stamina Per Level",
 				tooltip: () => null,
-				getValue: () => this.Config.combatStaminaGain,
-				setValue: value => this.Config.combatStaminaGain = value
+				getValue: () => Config.combatStaminaGain,
+				setValue: value => Config.combatStaminaGain = value
+			);
+			////////////////////////////////////////////////// HEALING VITALS //////////////////////////////////////////////////
+			configMenu.AddPage(
+				mod: ModManifest,
+				pageId: "sensakuma.healing",
+				pageTitle: () => "Healing"
+			);
+			// TITLE SLEEP VITALS
+			configMenu.AddSectionTitle(
+				mod: ModManifest,
+				text: () => "Sleep Vitals",
+				tooltip: () => "Alter Health and Stamina gained from Sleep."
+			);
+			// ENABLE SLEEP VITALS
+			configMenu.AddBoolOption(
+				mod: ModManifest,
+				name: () => "Enable",
+				tooltip: () => null,
+				getValue: () => Config.enableSleepVitals,
+				setValue: value => Config.enableSleepVitals = value
+			);
+			// FISHING HEALTH GAIN
+			configMenu.AddNumberOption(
+				mod: ModManifest,
+				name: () => "Health Restored",
+				tooltip: () => null,
+				getValue: () => Config.sleepHealthGain,
+				setValue: value => Config.sleepHealthGain = value
+			);
+			// FISHING STAMINA VALUE
+			configMenu.AddNumberOption(
+				mod: ModManifest,
+				name: () => "Stamina Restored",
+				tooltip: () => null,
+				getValue: () => Config.sleepStaminaGain,
+				setValue: value => Config.sleepStaminaGain = value
 			);
 		}
 	}

@@ -1,11 +1,10 @@
-﻿using System;
-
+﻿
 namespace FarmerVitalsEvolved
 {
 	internal class ModConfig
 	{
 		public bool enableMod = true;
-		public bool enableDebug = false;
+		public bool enableDebug = true;
 
 		public bool enableBaseVitals = true;
 		public int baseMaxHealth = 50; // Total Max Health 300
@@ -19,7 +18,7 @@ namespace FarmerVitalsEvolved
 		public int snakeMilkHealthGain = 50;
 		public int snakeMilkStaminaGain = 50;
 
-		public bool enableProfessionVitals = true;
+		public bool enableCombatProfessionVitals = true;
 		public int fighterHealthGain = 20;
 		public int defenderHealthGain = 30;
 
@@ -44,6 +43,8 @@ namespace FarmerVitalsEvolved
 		public float combatHealthGain = 3.0f;
 		public float combatStaminaGain = 0.0f;
 
-		
+		public bool enableSleepVitals = true;
+		public int sleepHealthGain = 25;
+		public int sleepStaminaGain = 75;
 	}
 }
