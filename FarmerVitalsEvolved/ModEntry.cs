@@ -18,14 +18,16 @@ namespace FarmerVitalsEvolved
 		private int savedHealth;
 		private int savedStamina;
 
-		private const int vanillaCombatHealthGain = 5;
 		private const int vanillaMaxHealth = 100;
 		private const int vanillaMaxStamina = 270;
 		private const int vanillaFighterHealth = 15;
 		private const int vanillaDefenderHealth = 25;
 		private const int vanillaSnakeMilkHealth = 25;
 		private const int vanillaStardropStamina = 34;
+		private const int vanillaCombatHealthGain = 5;
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// MOD INITIALIZING //////////////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		public override void Entry(IModHelper helper)
 		{
 			Config = Helper.ReadConfig<ModConfig>();
@@ -41,7 +43,9 @@ namespace FarmerVitalsEvolved
 			GenerateConfigMenu();
 			DebugToggle();
 		}
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// MAIN MOD LOOP //////////////////////////////////////////////////
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		private void OnDayStarted(object sender, DayStartedEventArgs e)
 		{
 			WorldReadyCheck();
@@ -60,20 +64,11 @@ namespace FarmerVitalsEvolved
 
 		private void OnSaving(object sender, SavingEventArgs e) // Alter Current health here
         {
-			if (Config.enableSleepVitals)
-            {
-				if (savedHealth != 0)
-                {
-					Game1.player.health = savedHealth;
-                }
-				if (savedStamina != 0)
-                {
-					Game1.player.stamina = savedStamina;
-                }
-            }
+			PersistVitals();
 		}
-
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// MAIN METHODS //////////////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		private void CalculateMaxVitals()
 		{
 			ResetVariables();
@@ -116,7 +111,9 @@ namespace FarmerVitalsEvolved
 			Game1.player.MaxStamina -= vitalsMaxStamina;
             Monitor.Log("Player now has " + Game1.player.maxHealth + " MaxHealth and, " + Game1.player.MaxStamina + " MaxStamina.", (LogLevel)debugVal);
 		}
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// CALCULATION METHODS //////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		private void CalculateBaseVitals()
 		{
 			int baseMaxHealth = Config.baseMaxHealth;
@@ -279,9 +276,10 @@ namespace FarmerVitalsEvolved
                 Monitor.Log("Combat Level " + combatLevel + " is giving you " + combatHealth + " MaxHealth and, " + combatStamina + " MaxStamina.", (LogLevel)debugVal);
                 Monitor.Log(vanillaCombatHealth.ToString() + " Health removed from Vanilla Combat progression", (LogLevel)debugVal);
 			}
-
 		}
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// MISC METHODS //////////////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		private void SaveCurrentVitals()
         {
 			if (Config.enableSleepVitals)
@@ -291,6 +289,21 @@ namespace FarmerVitalsEvolved
 				Monitor.Log("Ending night with " + savedHealth + " Health and " + savedStamina + " Stamina.", (LogLevel)debugVal);
 			}
         }
+
+		private void PersistVitals()
+        {
+			if (Config.enableSleepVitals)
+            {
+				if (savedHealth != 0)
+				{
+					Game1.player.health = savedHealth;
+				}
+				if (savedStamina != 0)
+				{
+					Game1.player.stamina = savedStamina;
+				}
+			}
+		}
 
 		private void ResetVariables()
 		{
@@ -320,6 +333,11 @@ namespace FarmerVitalsEvolved
 			}
 		}
 
+		private void ApplyConfig()
+        {
+			Helper.WriteConfig(Config);
+		}
+
 		private void VitalsSummary()
         {
 			Monitor.Log(Game1.player.maxHealth + " MaxHealth and, " + Game1.player.MaxStamina + " MaxStamina before calculations.", (LogLevel)debugVal);
@@ -327,10 +345,12 @@ namespace FarmerVitalsEvolved
 			Monitor.Log(newMaxHealth + " MaxHealth added, " + newMaxStamina + " MaxStamina added.", (LogLevel)debugVal);
 			Monitor.Log(vitalsMaxHealth + " MaxHealth difference, " + vitalsMaxStamina + "  MaxStamina difference.", (LogLevel)debugVal);
 		}
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// CONFIG MENU //////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		public void GenerateConfigMenu()
 		{
-			// get Generic Mod Config Menu's API (if it's installed)
+			// CHECK AND GET CONFIG MENU API
 			var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
 			if (configMenu is null)
 				return;
@@ -339,7 +359,7 @@ namespace FarmerVitalsEvolved
 			configMenu.Register(
 				mod: ModManifest,
 				reset: () => Config = new ModConfig(),
-				save: () => Helper.WriteConfig(Config)
+				save: () => ApplyConfig()
 			);
 			// MOD TOGGLE
 			configMenu.AddBoolOption(
@@ -352,38 +372,38 @@ namespace FarmerVitalsEvolved
 			// DEBUG TOGGLE
 			configMenu.AddBoolOption(
 				mod: ModManifest,
-				name: () => "Debug Log",
-				tooltip: () => "Shows mod calculations in the SMAPI log.",
 				getValue: () => Config.enableDebug,
-				setValue: value => Config.enableDebug = value
+				setValue: value => Config.enableDebug = value,
+				name: () => "Debug Log",
+				tooltip: () => "Shows mod calculations in the SMAPI log."
 			);
 			// BASE VITALS PAGE
 			configMenu.AddPageLink(
 				mod: ModManifest,
 				pageId: "sensakuma.base",
-				text: () => "Base Vitals Settings",
-				tooltip: () => null
+				text: () => "[Main Vitals Settings]",
+				tooltip: () => "Access settings for Base, Stardrop, and Snake Milk Vitals."
 			);
 			// SKILL PAGE
 			configMenu.AddPageLink(
 				mod: ModManifest,
 				pageId: "sensakuma.skill",
-				text: () => "Skill Vitals Settings",
-				tooltip: () => null
+				text: () => "[Skill Vitals Settings]",
+				tooltip: () => "Access settings for Vitals gained from Skill levels"
 			);
 			// PROFESSIONS PAGE
 			configMenu.AddPageLink(
 				mod: ModManifest,
 				pageId: "sensakuma.profession",
-				text: () => "Profession Vitals Settings",
-				tooltip: () => null
+				text: () => "[Profession Vitals Settings]",
+				tooltip: () => "Access settings to change Vitals gained from Professions"
 			);
-			// PROFESSIONS PAGE
+			// HEALING PAGE
 			configMenu.AddPageLink(
 				mod: ModManifest,
 				pageId: "sensakuma.healing",
-				text: () => "Healing Vitals Settings",
-				tooltip: () => null
+				text: () => "[Restoring Vitals Settings]",
+				tooltip: () => "Access settings for restoring Vitals on sleep."
 			);
 			////////////////////////////////////////////////// MAIN VITALS //////////////////////////////////////////////////
 			configMenu.AddPage(

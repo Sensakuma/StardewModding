@@ -8,4 +8,8 @@
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.0.0" />
   </ItemGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="mkdir &quot;C:\My Programs\Steam\steamapps\common\Stardew Valley\Mods\$(TargetName)&quot;&#xD;&#xA;copy /Y &quot;$(TargetPath)&quot; &quot;C:\My Programs\Steam\steamapps\common\Stardew Valley\Mods\$(TargetName)&quot;&#xD;&#xA;copy /Y &quot;$(ProjectDir)\manifest.json&quot; &quot;C:\My Programs\Steam\steamapps\common\Stardew Valley\Mods\$(TargetName)\manifest.json&quot;" />
+  </Target>
+
 </Project>
