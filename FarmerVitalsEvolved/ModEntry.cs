@@ -41,7 +41,6 @@ namespace FarmerVitalsEvolved
 		public void OnGameLaunched(object sender, GameLaunchedEventArgs e)
         {
 			GenerateConfigMenu();
-			DebugToggle();
 		}
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// MAIN MOD LOOP //////////////////////////////////////////////////
@@ -49,7 +48,7 @@ namespace FarmerVitalsEvolved
 		private void OnDayStarted(object sender, DayStartedEventArgs e)
 		{
 			WorldReadyCheck();
-            Monitor.Log("New Day, Calculating Vitals...", (LogLevel)debugVal);
+            Monitor.Log("New Day, Calculating Vitals...", (LogLevel)(debugVal+debugVal));
 			CalculateMaxVitals();
 			ApplyNewMaxVitals();
 			ApplyVitals();
@@ -62,7 +61,7 @@ namespace FarmerVitalsEvolved
 			RevertVitals();
 		}
 
-		private void OnSaving(object sender, SavingEventArgs e) // Alter Current health here
+		private void OnSaving(object sender, SavingEventArgs e)
         {
 			PersistVitals();
 		}
@@ -100,8 +99,14 @@ namespace FarmerVitalsEvolved
 
 		private void ApplyVitals()
 		{
-			Game1.player.health += Game1.player.maxHealth;
-			Game1.player.stamina += Game1.player.MaxStamina;
+			if (Config.enableSleepVitals)
+            {
+				ApplySleepVitals();
+            }
+            else
+            {
+				ApplyVanillaSleep();
+            }
 		}
 
 		private void RevertVitals()
@@ -207,8 +212,8 @@ namespace FarmerVitalsEvolved
 		private void CalculateFarmingVitals()
 		{
 			int farmingLevel = Game1.player.FarmingLevel;
-			int farmingHealth = (int)((float)farmingLevel * Config.farmingHealthGain);
-			int farmingStamina = (int)((float)farmingLevel * Config.farmingStaminaGain);
+			int farmingHealth = (int)(farmingLevel * Config.farmingHealthGain);
+			int farmingStamina = (int)(farmingLevel * Config.farmingStaminaGain);
 			newMaxHealth += farmingHealth;
 			newMaxStamina += farmingStamina;
             Monitor.Log("Farming Level " + farmingLevel + " is giving you " + farmingHealth + " MaxHealth and, " + farmingStamina + " MaxStamina.", (LogLevel)debugVal);
@@ -217,8 +222,8 @@ namespace FarmerVitalsEvolved
 		private void CalculateMiningVitals()
 		{
 			int miningLevel = Game1.player.MiningLevel;
-			int miningHealth = (int)((float)miningLevel * Config.miningHealthGain);
-			int miningStamina = (int)((float)miningLevel * Config.miningStaminaGain);
+			int miningHealth = (int)(miningLevel * Config.miningHealthGain);
+			int miningStamina = (int)(miningLevel * Config.miningStaminaGain);
 			newMaxHealth += miningHealth;
 			newMaxStamina += miningStamina;
             Monitor.Log("Mining Level " + miningLevel + " is giving you " + miningHealth + " MaxHealth and, " + miningStamina + " MaxStamina.", (LogLevel)debugVal);
@@ -227,8 +232,8 @@ namespace FarmerVitalsEvolved
 		private void CalculateForagingVitals()
 		{
 			int foragingLevel = Game1.player.ForagingLevel;
-			int foragingHealth = (int)((float)foragingLevel * Config.foragingHealthGain);
-			int foragingStamina = (int)((float)foragingLevel * Config.foragingStaminaGain);
+			int foragingHealth = (int)(foragingLevel * Config.foragingHealthGain);
+			int foragingStamina = (int)(foragingLevel * Config.foragingStaminaGain);
 			newMaxHealth += foragingHealth;
 			newMaxStamina += foragingStamina;
             Monitor.Log("Farming Level " + foragingLevel + " is giving you " + foragingHealth + " MaxHealth and, " + foragingStamina + " MaxStamina.", (LogLevel)debugVal);
@@ -237,8 +242,8 @@ namespace FarmerVitalsEvolved
 		private void CalculateFishingVitals()
 		{
 			int fishingLevel = Game1.player.FishingLevel;
-			int fishingHealth = (int)((float)fishingLevel * Config.fishingHealthGain);
-			int fishingStamina = (int)((float)fishingLevel * Config.fishingStaminaGain);
+			int fishingHealth = (int)(fishingLevel * Config.fishingHealthGain);
+			int fishingStamina = (int)(fishingLevel * Config.fishingStaminaGain);
 			newMaxHealth += fishingHealth;
 			newMaxStamina += fishingStamina;
             Monitor.Log("Farming Level " + fishingLevel + " is giving you " + fishingHealth + " MaxHealth and, " + fishingStamina + " MaxStamina.", (LogLevel)debugVal);
@@ -247,7 +252,7 @@ namespace FarmerVitalsEvolved
 		private void CalculateCombatVitals()
 		{
 			int combatLevel = Game1.player.CombatLevel;
-			int combatStamina = (int)((float)combatLevel * Config.combatStaminaGain);
+			int combatStamina = (int)(combatLevel * Config.combatStaminaGain);
 			newMaxStamina += combatStamina;
 
 			if (Config.overrideVanillaCombatHealth == false)
@@ -257,7 +262,7 @@ namespace FarmerVitalsEvolved
 			}
 			else
 			{
-				int combatHealth = (int)((float)combatLevel * Config.combatHealthGain);
+				int combatHealth = (int)(combatLevel * Config.combatHealthGain);
 				int tempCombatLevel = combatLevel;
 				newMaxHealth += combatHealth;
 				if (tempCombatLevel >= 10)
@@ -276,6 +281,35 @@ namespace FarmerVitalsEvolved
                 Monitor.Log("Combat Level " + combatLevel + " is giving you " + combatHealth + " MaxHealth and, " + combatStamina + " MaxStamina.", (LogLevel)debugVal);
                 Monitor.Log(vanillaCombatHealth.ToString() + " Health removed from Vanilla Combat progression", (LogLevel)debugVal);
 			}
+		}
+
+		private void ApplySleepVitals()
+        {
+			if (Game1.player.health < Game1.player.maxHealth)
+            {
+				float healthPercent = Config.sleepHealthGain * 0.01f;
+				Game1.player.health += (int)(Game1.player.maxHealth * healthPercent);
+				if (Game1.player.health > Game1.player.maxHealth)
+                {
+					Game1.player.health = Game1.player.maxHealth;
+                }
+            }
+			if (Game1.player.stamina < Game1.player.MaxStamina)
+            {
+				float staminaPercent = Config.sleepStaminaGain * 0.01f;
+				Game1.player.stamina += Game1.player.MaxStamina * staminaPercent;
+				if (Game1.player.stamina > Game1.player.MaxStamina)
+                {
+					Game1.player.stamina = Game1.player.MaxStamina;
+                }
+			}
+        }
+		private void ApplyVanillaSleep()
+        {
+			float staminaPercent = Game1.player.stamina / (Game1.player.MaxStamina - vitalsMaxStamina);
+			int staminaRestore = (int)(Game1.player.MaxStamina * staminaPercent);
+			Game1.player.health = Game1.player.maxHealth;
+			Game1.player.stamina = staminaRestore;
 		}
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// MISC METHODS //////////////////////////////////////////////////
@@ -333,17 +367,23 @@ namespace FarmerVitalsEvolved
 			}
 		}
 
-		private void ApplyConfig()
-        {
-			Helper.WriteConfig(Config);
-		}
-
 		private void VitalsSummary()
         {
 			Monitor.Log(Game1.player.maxHealth + " MaxHealth and, " + Game1.player.MaxStamina + " MaxStamina before calculations.", (LogLevel)debugVal);
 			Monitor.Log(removeVanillaHealth + " Vanilla MaxHealth removed, " + removeVanillaStamina + " Vanilla MaxStamina removed.", (LogLevel)debugVal);
 			Monitor.Log(newMaxHealth + " MaxHealth added, " + newMaxStamina + " MaxStamina added.", (LogLevel)debugVal);
 			Monitor.Log(vitalsMaxHealth + " MaxHealth difference, " + vitalsMaxStamina + "  MaxStamina difference.", (LogLevel)debugVal);
+		}
+		private void ApplyConfig()
+		{
+			Monitor.Log("Settings changed, recalculating...", (LogLevel)(debugVal+1));
+			Helper.WriteConfig(Config);
+			DebugToggle();
+			WorldReadyCheck();
+			RevertVitals();
+			ResetVariables();
+			CalculateMaxVitals();
+			ApplyNewMaxVitals();
 		}
 		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// CONFIG MENU //////////////////////////////////////////////////
@@ -415,7 +455,7 @@ namespace FarmerVitalsEvolved
 			configMenu.AddSectionTitle(
 				mod: ModManifest,
 				text: () => "Base Vitals",
-				tooltip: () => "Change starting Health and Stamina."
+				tooltip: () => "Change starting Health and Energy."
 			);
 			// ENABLE BASE VITALS
 			configMenu.AddBoolOption(
@@ -436,8 +476,8 @@ namespace FarmerVitalsEvolved
 			// CHOOSE BASE STAMINA
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Base Max Stamina",
-				tooltip: () => "Stamina at the start of the game. (Vanilla is 270)",
+				name: () => "Base Max Energy",
+				tooltip: () => "Energy at the start of the game. (Vanilla is 270)",
 				getValue: () => Config.baseMaxStamina,
 				setValue: value => Config.baseMaxStamina = value
 			);
@@ -445,7 +485,7 @@ namespace FarmerVitalsEvolved
 			configMenu.AddSectionTitle(
 				mod: ModManifest,
 				text: () => "Stardrop Vitals",
-				tooltip: () => "Change Health and Stamina gained from Stardrops."
+				tooltip: () => "Change Health and Energy gained from Stardrops."
 			);
 			// ENABLE STARDROP VITALS
 			configMenu.AddBoolOption(
@@ -466,8 +506,8 @@ namespace FarmerVitalsEvolved
 			// STARDROP STAMINA VALUE
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Stardrop Stamina",
-				tooltip: () => "Stamina gained from consuming a Stardrop. (Vanilla is 34)",
+				name: () => "Stardrop Energy",
+				tooltip: () => "Energy gained from consuming a Stardrop. (Vanilla is 34)",
 				getValue: () => Config.stardropStaminaGain,
 				setValue: value => Config.stardropStaminaGain = value
 			);
@@ -475,12 +515,12 @@ namespace FarmerVitalsEvolved
 			configMenu.AddSectionTitle(
 				mod: ModManifest,
 				text: () => "Iridium Snake Milk Vitals",
-				tooltip: () => "Change Health and Stamina gained from Iridium Snake Milk."
+				tooltip: () => "Change Health and Energy gained from Iridium Snake Milk."
 			);
 			// ENABLE IRIDIUM SNAKE MILK VITALS
 			configMenu.AddBoolOption(
 				mod: ModManifest,
-				name: () => "Enable",
+				name: () => "Enabled",
 				tooltip: () => null,
 				getValue: () => Config.enableSnakeMilkVitals,
 				setValue: value => Config.enableSnakeMilkVitals = value
@@ -496,8 +536,8 @@ namespace FarmerVitalsEvolved
 			// IRIDIUM SNAKE MILK STAMINA VALUE
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Snake Milk Stamina",
-				tooltip: () => "Stamina gained from consuming a Iridium Snake Milk. (Vanilla is 0)",
+				name: () => "Snake Milk Energy",
+				tooltip: () => "Energy gained from consuming a Iridium Snake Milk. (Vanilla is 0)",
 				getValue: () => Config.snakeMilkStaminaGain,
 				setValue: value => Config.snakeMilkStaminaGain = value
 			);
@@ -547,12 +587,12 @@ namespace FarmerVitalsEvolved
 			configMenu.AddSectionTitle(
 				mod: ModManifest,
 				text: () => "Farming Skill Vitals",
-				tooltip: () => "Gain Health and Stamina from Farming Levels."
+				tooltip: () => "Gain Health and Energy from Farming Levels."
 			);
 			// ENABLE FARMING VITALS
 			configMenu.AddBoolOption(
 				mod: ModManifest,
-				name: () => "Enable",
+				name: () => "Enabled",
 				tooltip: () => null,
 				getValue: () => Config.enableFarmingVitals,
 				setValue: value => Config.enableFarmingVitals = value
@@ -568,7 +608,7 @@ namespace FarmerVitalsEvolved
 			// FARMING STAMINA VALUE
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Stamina Per Level",
+				name: () => "Energy Per Level",
 				tooltip: () => null,
 				getValue: () => Config.farmingStaminaGain,
 				setValue: value => Config.farmingStaminaGain = value
@@ -577,12 +617,12 @@ namespace FarmerVitalsEvolved
 			configMenu.AddSectionTitle(
 				mod: ModManifest,
 				text: () => "Mining Skill Vitals",
-				tooltip: () => "Gain Health and Stamina from Mining Levels."
+				tooltip: () => "Gain Health and Energy from Mining Levels."
 			);
 			// ENABLE MINING VITALS
 			configMenu.AddBoolOption(
 				mod: ModManifest,
-				name: () => "Enable",
+				name: () => "Enabled",
 				tooltip: () => null,
 				getValue: () => Config.enableMiningVitals,
 				setValue: value => Config.enableMiningVitals = value
@@ -598,7 +638,7 @@ namespace FarmerVitalsEvolved
 			// MINING STAMINA VALUE
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Stamina Per Level",
+				name: () => "Energy Per Level",
 				tooltip: () => null,
 				getValue: () => Config.miningStaminaGain,
 				setValue: value => Config.miningStaminaGain = value
@@ -607,12 +647,12 @@ namespace FarmerVitalsEvolved
 			configMenu.AddSectionTitle(
 				mod: ModManifest,
 				text: () => "Foraging Skill Vitals",
-				tooltip: () => "Gain Health and Stamina from Foraging Levels."
+				tooltip: () => "Gain Health and Energy from Foraging Levels."
 			);
 			// ENABLE FORAGING VITALS
 			configMenu.AddBoolOption(
 				mod: ModManifest,
-				name: () => "Enable",
+				name: () => "Enabled",
 				tooltip: () => null,
 				getValue: () => Config.enableForagingVitals,
 				setValue: value => Config.enableForagingVitals = value
@@ -628,7 +668,7 @@ namespace FarmerVitalsEvolved
 			// FORAGING STAMINA VALUE
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Stamina Per Level",
+				name: () => "Energy Per Level",
 				tooltip: () => null,
 				getValue: () => Config.foragingStaminaGain,
 				setValue: value => Config.foragingStaminaGain = value
@@ -637,12 +677,12 @@ namespace FarmerVitalsEvolved
 			configMenu.AddSectionTitle(
 				mod: ModManifest,
 				text: () => "Fishing Skill Vitals",
-				tooltip: () => "Gain Health and Stamina from Fishing Levels."
+				tooltip: () => "Gain Health and Energy from Fishing Levels."
 			);
 			// ENABLE FISHING VITALS
 			configMenu.AddBoolOption(
 				mod: ModManifest,
-				name: () => "Enable",
+				name: () => "Enabled",
 				tooltip: () => null,
 				getValue: () => Config.enableFishingVitals,
 				setValue: value => Config.enableFishingVitals = value
@@ -658,7 +698,7 @@ namespace FarmerVitalsEvolved
 			// FISHING STAMINA VALUE
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Stamina Per Level",
+				name: () => "Energy Per Level",
 				tooltip: () => null,
 				getValue: () => Config.fishingStaminaGain,
 				setValue: value => Config.fishingStaminaGain = value
@@ -667,12 +707,12 @@ namespace FarmerVitalsEvolved
 			configMenu.AddSectionTitle(
 				mod: ModManifest,
 				text: () => "Combat Skill Vitals",
-				tooltip: () => "Gain Health and Stamina from Combat Levels."
+				tooltip: () => "Gain Health and Energy from Combat Levels."
 			);
 			// ENABLE COMBAT VITALS
 			configMenu.AddBoolOption(
 				mod: ModManifest,
-				name: () => "Enable",
+				name: () => "Enabled",
 				tooltip: () => null,
 				getValue: () => Config.enableCombatVitals,
 				setValue: value => Config.enableCombatVitals = value
@@ -696,7 +736,7 @@ namespace FarmerVitalsEvolved
 			// COMBAT STAMINA VALUE
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Stamina Per Level",
+				name: () => "Energy Per Level",
 				tooltip: () => null,
 				getValue: () => Config.combatStaminaGain,
 				setValue: value => Config.combatStaminaGain = value
@@ -711,32 +751,82 @@ namespace FarmerVitalsEvolved
 			configMenu.AddSectionTitle(
 				mod: ModManifest,
 				text: () => "Sleep Vitals",
-				tooltip: () => "Alter Health and Stamina gained from Sleep."
+				tooltip: () => "Alter Health and Energy gained from Sleep."
 			);
 			// ENABLE SLEEP VITALS
 			configMenu.AddBoolOption(
 				mod: ModManifest,
-				name: () => "Enable",
+				name: () => "Enabled",
 				tooltip: () => null,
 				getValue: () => Config.enableSleepVitals,
 				setValue: value => Config.enableSleepVitals = value
 			);
-			// FISHING HEALTH GAIN
+			// SLEEP HEALTH GAIN
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Health Restored",
+				name: () => "Health % Restored",
 				tooltip: () => null,
+				min: 0,
+				max: 100,
+				interval: 1,
 				getValue: () => Config.sleepHealthGain,
 				setValue: value => Config.sleepHealthGain = value
 			);
-			// FISHING STAMINA VALUE
+			// SLEEP STAMINA VALUE
 			configMenu.AddNumberOption(
 				mod: ModManifest,
-				name: () => "Stamina Restored",
+				name: () => "Energy % Restored",
 				tooltip: () => null,
+				min: 0,
+				max: 100,
+				interval: 1,
 				getValue: () => Config.sleepStaminaGain,
 				setValue: value => Config.sleepStaminaGain = value
 			);
+			// EXHAUSTED PENALTY VALUE
+			configMenu.AddNumberOption(
+				mod: ModManifest,
+				name: () => "Exhausted % Loss",
+				tooltip: () => null,
+				min: 0,
+				max: 100,
+				interval: 1,
+				getValue: () => Config.exhaustedLoss,
+				setValue: value => Config.exhaustedLoss = value
+			);
+			// LATE PENALTY INTERVAL
+			configMenu.AddNumberOption(
+				mod: ModManifest,
+				name: () => "Late Penalty % Interval",
+				tooltip: () => null,
+				min: 0f,
+				max: 9f,
+				interval: 0.5f,
+				getValue: () => Config.latePenaltyInterval,
+				setValue: value => Config.latePenaltyInterval = value
+			);
+			// LATE PENALTY AT ONE
+			configMenu.AddNumberOption(
+				mod: ModManifest,
+				name: () => "1:00AM Penalty %",
+				tooltip: () => null,
+				min: 0,
+				max: 100,
+				interval: 1,
+				getValue: () => Config.latePenaltyOne,
+				setValue: value => Config.latePenaltyOne = value
+				);
+			// LATE PENALTY AT TWO
+			configMenu.AddNumberOption(
+				mod: ModManifest,
+				name: () => "2:00AM Penalty %",
+				tooltip: () => null,
+				min: 0,
+				max: 100,
+				interval: 1,
+				getValue: () => Config.latePenaltyTwo,
+				setValue: value => Config.latePenaltyTwo = value
+				);
 		}
 	}
 }

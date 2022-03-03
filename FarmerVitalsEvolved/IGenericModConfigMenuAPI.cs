@@ -18,7 +18,7 @@ namespace FarmerVitalsEvolved
         /// <param name="save">Save the mod's current config to the <c>config.json</c> file.</param>
         /// <param name="titleScreenOnly">Whether the options can only be edited from the title screen.</param>
         /// <remarks>Each mod can only be registered once, unless it's deleted via <see cref="Unregister"/> before calling this again.</remarks>
-        void Register(IManifest mod, Action reset, Action save, bool titleScreenOnly = true);
+        void Register(IManifest mod, Action reset, Action save, bool titleScreenOnly = false);
 
 
         /****
