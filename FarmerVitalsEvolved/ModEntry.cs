@@ -48,7 +48,7 @@ namespace FarmerVitalsEvolved
 		private void OnDayStarted(object sender, DayStartedEventArgs e)
 		{
 			WorldReadyCheck();
-            Monitor.Log("New Day, Calculating Vitals...", (LogLevel)(debugVal+debugVal));
+            Monitor.Log("New Day, Calculating Vitals...", (LogLevel)(debugVal*2));
 			CalculateMaxVitals();
 			ApplyNewMaxVitals();
 			ApplyVitals();
@@ -58,12 +58,13 @@ namespace FarmerVitalsEvolved
 		{
 			WorldReadyCheck();
 			SaveCurrentVitals();
-			RevertVitals();
+			RevertMaxVitals();
 		}
 
 		private void OnSaving(object sender, SavingEventArgs e)
         {
 			PersistVitals();
+
 		}
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////// MAIN METHODS //////////////////////////////////////////////////
@@ -109,7 +110,7 @@ namespace FarmerVitalsEvolved
             }
 		}
 
-		private void RevertVitals()
+		private void RevertMaxVitals()
 		{
             Monitor.Log("Removing Vitals before saving...", (LogLevel)debugVal);
 			Game1.player.maxHealth -= vitalsMaxHealth;
@@ -369,18 +370,22 @@ namespace FarmerVitalsEvolved
 
 		private void VitalsSummary()
         {
-			Monitor.Log(Game1.player.maxHealth + " MaxHealth and, " + Game1.player.MaxStamina + " MaxStamina before calculations.", (LogLevel)debugVal);
-			Monitor.Log(removeVanillaHealth + " Vanilla MaxHealth removed, " + removeVanillaStamina + " Vanilla MaxStamina removed.", (LogLevel)debugVal);
-			Monitor.Log(newMaxHealth + " MaxHealth added, " + newMaxStamina + " MaxStamina added.", (LogLevel)debugVal);
-			Monitor.Log(vitalsMaxHealth + " MaxHealth difference, " + vitalsMaxStamina + "  MaxStamina difference.", (LogLevel)debugVal);
+			WorldReadyCheck();
+			if (debugVal == 1)
+            {
+				Monitor.Log(Game1.player.maxHealth + " MaxHealth and, " + Game1.player.MaxStamina + " MaxStamina before calculations.", (LogLevel)debugVal);
+				Monitor.Log(removeVanillaHealth + " Vanilla MaxHealth removed, " + removeVanillaStamina + " Vanilla MaxStamina removed.", (LogLevel)debugVal);
+				Monitor.Log(newMaxHealth + " MaxHealth added, " + newMaxStamina + " MaxStamina added.", (LogLevel)debugVal);
+				Monitor.Log(vitalsMaxHealth + " MaxHealth difference, " + vitalsMaxStamina + "  MaxStamina difference.", (LogLevel)debugVal);
+			}
 		}
 		private void ApplyConfig()
 		{
-			Monitor.Log("Settings changed, recalculating...", (LogLevel)(debugVal+1));
 			Helper.WriteConfig(Config);
 			DebugToggle();
 			WorldReadyCheck();
-			RevertVitals();
+			Monitor.Log("Settings changed, recalculating...", (LogLevel)(debugVal + 1));
+			RevertMaxVitals();
 			ResetVariables();
 			CalculateMaxVitals();
 			ApplyNewMaxVitals();
@@ -805,28 +810,6 @@ namespace FarmerVitalsEvolved
 				getValue: () => Config.latePenaltyInterval,
 				setValue: value => Config.latePenaltyInterval = value
 			);
-			// LATE PENALTY AT ONE
-			configMenu.AddNumberOption(
-				mod: ModManifest,
-				name: () => "1:00AM Penalty %",
-				tooltip: () => null,
-				min: 0,
-				max: 100,
-				interval: 1,
-				getValue: () => Config.latePenaltyOne,
-				setValue: value => Config.latePenaltyOne = value
-				);
-			// LATE PENALTY AT TWO
-			configMenu.AddNumberOption(
-				mod: ModManifest,
-				name: () => "2:00AM Penalty %",
-				tooltip: () => null,
-				min: 0,
-				max: 100,
-				interval: 1,
-				getValue: () => Config.latePenaltyTwo,
-				setValue: value => Config.latePenaltyTwo = value
-				);
 		}
 	}
 }

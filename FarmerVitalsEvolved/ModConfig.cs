@@ -44,11 +44,9 @@ namespace FarmerVitalsEvolved
 		public float combatStaminaGain = 0.0f;
 
 		public bool enableSleepVitals = true;
-		public int sleepHealthGain = 25;
-		public int sleepStaminaGain = 75;
+		public int sleepHealthGain = 5;
+		public int sleepStaminaGain = 10;
 		public int exhaustedLoss = 50;
-		public float latePenaltyInterval = 2.5f;
-		public int latePenaltyOne = 25;
-		public int latePenaltyTwo = 50;
+		public bool enableExhaustedHealth = false;
 	}
 }
